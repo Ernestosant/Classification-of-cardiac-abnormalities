@@ -6,7 +6,7 @@ from fastai.tabular.all import *
 from sklearn.preprocessing import MinMaxScaler
 import gradio as gr
 
-model = load_learner('model_1.pkl')
+model = load_learner('inception_time_1.pkl')
 # inference fucntion
 def inference(model, x_test):  
   min_max_scaler = MinMaxScaler()
