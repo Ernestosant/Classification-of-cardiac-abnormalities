@@ -54,8 +54,9 @@ Isolation Forest is evaluated as a separate binary task:
 | Normal | Class 1 |
 | Anomaly | Classes 2, 3, 4, and 5 |
 
-The anomaly detector is also available as an auxiliary signal for the ensemble,
-but its threshold and contribution are selected on validation data only.
+The anomaly detector is also converted into a calibrated five-class
+pseudo-probability for the entropy-weighted ensemble. Its calibration and
+contribution are selected on validation data only.
 
 ## What This Project Demonstrates
 
@@ -70,4 +71,3 @@ but its threshold and contribution are selected on validation data only.
 This is not a diagnostic system. ECG5000 is a benchmark dataset, not a
 deployment validation dataset. The project should be interpreted as evidence of
 research engineering discipline, not as evidence of clinical readiness.
-

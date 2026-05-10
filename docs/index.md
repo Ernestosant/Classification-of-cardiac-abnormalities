@@ -34,7 +34,7 @@ project entry point in [`../README.md`](../README.md).
 | [InceptionTime](models/inception-time.md) | Kaggle GPU training, CPU export, validation behavior |
 | [XGBoost](models/xgboost.md) | Objective, class weighting, early stopping, and metrics |
 | [Isolation Forest](models/isolation-forest.md) | Normal-only training and anomaly evaluation |
-| [Ensemble](models/ensemble.md) | Validation-only model selection and final weights |
+| [Ensemble](models/ensemble.md) | Entropy-weighted three-model formula and final weights |
 
 ## Results And Reproducibility
 
@@ -54,7 +54,7 @@ project entry point in [`../README.md`](../README.md).
 | [`../models/xgboost_model.json`](../models/xgboost_model.json) | XGBoost classifier |
 | [`../models/isolation_forest.joblib`](../models/isolation_forest.joblib) | Isolation Forest anomaly detector |
 | [`../models/inception_cpu.pkl`](../models/inception_cpu.pkl) | Exported InceptionTime learner for CPU inference |
-| [`../models/ensemble_config.json`](../models/ensemble_config.json) | Validation-selected ensemble configuration |
+| [`../models/ensemble_config.json`](../models/ensemble_config.json) | Entropy-weighted ensemble formula configuration |
 | [`../reports/model_results.md`](../reports/model_results.md) | Generated evaluation report |
 
 ## Experiment Flow
@@ -73,4 +73,3 @@ flowchart TD
     H --> I["Evaluate once on official test split"]
     I --> J["Reports and CPU-only inference artifacts"]
 ```
-

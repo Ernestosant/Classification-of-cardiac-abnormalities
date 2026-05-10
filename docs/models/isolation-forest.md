@@ -17,6 +17,11 @@ Training only on normal beats preserves the anomaly-detection framing. The
 model is evaluated as a binary detector and can also provide an auxiliary
 anomaly confidence signal for the ensemble.
 
+For the final formula ensemble, this binary signal is calibrated on validation
+data and converted into a five-class pseudo-probability. Class 1 receives the
+normal probability, and classes 2-5 share the anomaly probability according to
+abnormal class priors computed from the inner training split only.
+
 ## Decision Rule
 
 The saved configuration records the threshold. A sample is considered anomalous
@@ -50,4 +55,3 @@ Isolation Forest is useful for detecting whether a beat is abnormal, especially
 when abnormal recall is important. It does not identify the exact abnormal
 subtype and should not be interpreted as a replacement for the five-class
 models.
-

@@ -41,7 +41,7 @@ human-readable documentation.
 | `models/isolation_forest.joblib` | Trained Isolation Forest |
 | `models/isolation_forest_config.json` | Threshold and anomaly score configuration |
 | `models/inception_cpu.pkl` | Exported InceptionTime learner for CPU inference |
-| `models/ensemble_config.json` | Frozen validation-selected ensemble configuration |
+| `models/ensemble_config.json` | Frozen entropy-weighted ensemble formula configuration |
 | `reports/model_results.md` | Generated model report |
 | `reports/metrics_*.json` | Machine-readable metrics |
 | `reports/confusion_matrix_*.png` | Validation and test confusion matrices |
@@ -51,4 +51,3 @@ human-readable documentation.
 Kaggle credentials and local runtime outputs should stay outside version
 control. The repository `.gitignore` excludes `.kaggle/`, `kaggle.json`,
 nested `kaggle.json` files, Kaggle logs, and temporary report outputs.
-
