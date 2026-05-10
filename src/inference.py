@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from functools import lru_cache
 from pathlib import Path
 
 import joblib
@@ -26,6 +27,7 @@ def force_cpu_only() -> None:
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 
+@lru_cache(maxsize=1)
 def load_xgboost_model(path: Path = XGBOOST_MODEL_PATH) -> XGBClassifier:
     if not path.exists():
         raise FileNotFoundError(f"Missing XGBoost model: {path}")
@@ -34,12 +36,14 @@ def load_xgboost_model(path: Path = XGBOOST_MODEL_PATH) -> XGBClassifier:
     return model
 
 
+@lru_cache(maxsize=1)
 def load_scaler(path: Path = SCALER_PATH):
     if not path.exists():
         raise FileNotFoundError(f"Missing scaler: {path}")
     return joblib.load(path)
 
 
+@lru_cache(maxsize=1)
 def load_isolation_artifacts(
     model_path: Path = IFOREST_MODEL_PATH,
     config_path: Path = IFOREST_CONFIG_PATH,
@@ -52,6 +56,14 @@ def load_isolation_artifacts(
     with config_path.open("r", encoding="utf-8") as f:
         config = json.load(f)
     return model, config
+
+
+@lru_cache(maxsize=1)
+def load_ensemble_config(path: Path = ENSEMBLE_CONFIG_PATH) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing ensemble config: {path}")
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def anomaly_confidence(decision_scores: np.ndarray, threshold: float, scale: float) -> np.ndarray:
@@ -83,10 +95,7 @@ def normalize_proba(proba: np.ndarray) -> np.ndarray:
 
 
 def predict_ensemble_proba(X_scaled: np.ndarray, config_path: Path = ENSEMBLE_CONFIG_PATH) -> tuple[np.ndarray, dict]:
-    if not config_path.exists():
-        raise FileNotFoundError(f"Missing ensemble config: {config_path}")
-    with config_path.open("r", encoding="utf-8") as f:
-        config = json.load(f)
+    config = load_ensemble_config(config_path)
 
     sources = config["supervised_sources"]
     probas = []
@@ -126,7 +135,7 @@ def predict_ensemble_proba(X_scaled: np.ndarray, config_path: Path = ENSEMBLE_CO
     return final, details
 
 
-def predict_file_to_dataframe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
+def predict_file_to_dataframe(path: str | Path, include_inception: bool = False) -> tuple[pd.DataFrame, list[str]]:
     force_cpu_only()
     parsed = read_inference_csv(path)
     scaler = load_scaler()
@@ -152,20 +161,23 @@ def predict_file_to_dataframe(path: str | Path) -> tuple[pd.DataFrame, list[str]
         "xgboost_confidence": xgb_proba.max(axis=1),
     }
 
-    inception_predictor, inception_status = load_inception_predictor()
-    if inception_predictor is None:
-        inception_note = f"InceptionTime unavailable: {inception_status}"
+    if include_inception:
+        inception_predictor, inception_status = load_inception_predictor()
+        if inception_predictor is None:
+            inception_note = f"InceptionTime unavailable: {inception_status}"
+        else:
+            inception_proba = inception_predictor(X_scaled)
+            inception_pred = inception_proba.argmax(axis=1) + 1
+            columns.update(
+                {
+                    "inception_class": inception_pred,
+                    "inception_label": [CLASS_NAMES[int(label)] for label in inception_pred],
+                    "inception_confidence": inception_proba.max(axis=1),
+                }
+            )
+            inception_note = "InceptionTime prediction completed."
     else:
-        inception_proba = inception_predictor(X_scaled)
-        inception_pred = inception_proba.argmax(axis=1) + 1
-        columns.update(
-            {
-                "inception_class": inception_pred,
-                "inception_label": [CLASS_NAMES[int(label)] for label in inception_pred],
-                "inception_confidence": inception_proba.max(axis=1),
-            }
-        )
-        inception_note = "InceptionTime prediction completed."
+        inception_note = "Skipped separate InceptionTime columns for faster CPU inference."
 
     columns.update(
         {

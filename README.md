@@ -100,6 +100,10 @@ Run CPU-only batch inference:
 python -m src.predict --input path\to\beats.csv --output predictions.csv
 ```
 
+Separate InceptionTime columns are skipped by default for fast CPU inference.
+Add `--include-inception` only when you explicitly want that slower neural
+baseline output.
+
 Launch the simple Gradio interface:
 
 ```powershell
@@ -156,4 +160,3 @@ tests/               Leakage and pipeline guard tests
 - InceptionTime is reported honestly even when the final ensemble assigns it
   zero weight.
 - CPU-only inference loads saved artifacts and performs no fitting.
-

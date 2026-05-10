@@ -19,7 +19,15 @@ The input CSV must contain either:
 | 141 columns | First column is a label and is ignored |
 
 The output CSV includes ensemble predictions, XGBoost predictions, InceptionTime
-predictions when available, and Isolation Forest anomaly scores.
+predictions when explicitly requested, and Isolation Forest anomaly scores.
+
+By default, separate InceptionTime columns are skipped because the current
+ensemble does not use InceptionTime and CPU inference is much slower for that
+neural model. To include those columns:
+
+```powershell
+python -m src.predict --input path\to\beats.csv --output predictions.csv --include-inception
+```
 
 ## Gradio Interface
 
@@ -32,6 +40,9 @@ python app.py
 The interface accepts a CSV file and returns a predictions table plus notes about
 label-column detection and model availability.
 
+The checkbox for InceptionTime columns is off by default. Leave it off for fast
+full-file inference, especially when uploading the official test CSV.
+
 ## CPU-Only Behavior
 
 The inference code sets `CUDA_VISIBLE_DEVICES` to disable GPU use. This applies
@@ -42,6 +53,5 @@ FastAI/tsai learner on CPU.
 
 The ensemble uses only models with positive weights in
 `models/ensemble_config.json`. The current ensemble uses XGBoost. InceptionTime
-is still reported separately in inference outputs when `models/inception_cpu.pkl`
+can still be reported separately when requested and when `models/inception_cpu.pkl`
 and the optional dependencies are available.
-

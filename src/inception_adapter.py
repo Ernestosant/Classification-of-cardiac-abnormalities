@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +10,7 @@ import numpy as np
 from .config import CLASS_VALUES, INCEPTION_MODEL_PATH, N_TIMESTEPS
 
 
+@lru_cache(maxsize=1)
 def load_inception_predictor(model_path: Path = INCEPTION_MODEL_PATH):
     """Load an exported fastai/tsai learner for CPU-only inference if available."""
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
