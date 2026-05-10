@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from .inference import predict_file_to_dataframe
 
@@ -15,6 +16,13 @@ def main() -> None:
         help="Deprecated no-op. InceptionTime is always used by the formula ensemble.",
     )
     args = parser.parse_args()
+
+    if args.include_inception:
+        print(
+            "WARNING: --include-inception is deprecated and has no effect; "
+            "InceptionTime is always used by the formula ensemble.",
+            file=sys.stderr,
+        )
 
     predictions, notes = predict_file_to_dataframe(args.input)
     predictions.to_csv(args.output, index=False)

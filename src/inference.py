@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from functools import lru_cache
 from pathlib import Path
 
@@ -125,6 +126,14 @@ def predict_ensemble_proba(
 
 
 def predict_file_to_dataframe(path: str | Path, include_inception: bool | None = None) -> tuple[pd.DataFrame, list[str]]:
+    if include_inception is not None:
+        warnings.warn(
+            "include_inception is deprecated and has no effect; "
+            "InceptionTime is always used by the formula ensemble.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     force_cpu_only()
     parsed = read_inference_csv(path)
     scaler = load_scaler()

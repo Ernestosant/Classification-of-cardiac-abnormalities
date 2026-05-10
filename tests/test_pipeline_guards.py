@@ -145,6 +145,42 @@ def test_isolation_forest_pseudo_probabilities_sum_to_one():
     assert proba[0, 0] < proba[1, 0]
 
 
+def test_isolation_forest_pseudo_probabilities_reject_invalid_priors():
+    with pytest.raises(ValueError, match="Missing abnormal class priors"):
+        isolation_forest_class_proba(
+            decision_scores=np.asarray([0.0]),
+            if_config={"threshold": 0.0, "scale": 1.0},
+            calibration={"intercept": 0.0, "coefficient": 1.0},
+            abnormal_priors={"2": 0.0, "3": 0.0, "4": 0.0},
+        )
+
+    with pytest.raises(ValueError, match="positive sum"):
+        isolation_forest_class_proba(
+            decision_scores=np.asarray([0.0]),
+            if_config={"threshold": 0.0, "scale": 1.0},
+            calibration={"intercept": 0.0, "coefficient": 1.0},
+            abnormal_priors={"2": 0.0, "3": 0.0, "4": 0.0, "5": 0.0},
+        )
+
+
+def test_entropy_weighted_ensemble_rejects_invalid_base_weights():
+    probabilities = {
+        "xgboost": np.asarray([[1.0, 0.0, 0.0, 0.0, 0.0]]),
+        "inception": np.asarray([[1.0, 0.0, 0.0, 0.0, 0.0]]),
+        "isolation_forest": np.asarray([[1.0, 0.0, 0.0, 0.0, 0.0]]),
+    }
+
+    with pytest.raises(ValueError, match="Missing ensemble base weights"):
+        entropy_weighted_ensemble(probabilities, {"xgboost": 1.0, "inception": 0.0}, epsilon=0.05)
+
+    with pytest.raises(ValueError, match="positive sum"):
+        entropy_weighted_ensemble(
+            probabilities,
+            {"xgboost": 0.0, "inception": 0.0, "isolation_forest": 0.0},
+            epsilon=0.05,
+        )
+
+
 def test_kaggle_artifact_extract_rejects_path_traversal(tmp_path):
     archive = tmp_path / "unsafe.zip"
     with zipfile.ZipFile(archive, "w") as zf:

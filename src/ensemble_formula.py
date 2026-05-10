@@ -12,6 +12,45 @@ from .config import CLASS_VALUES
 MODEL_NAMES = ("xgboost", "inception", "isolation_forest")
 
 
+def validate_abnormal_priors(abnormal_priors: dict[str, float]) -> np.ndarray:
+    missing = [str(label) for label in CLASS_VALUES[1:] if str(label) not in abnormal_priors]
+    if missing:
+        raise ValueError(f"Missing abnormal class priors for labels: {missing}")
+
+    try:
+        priors = np.asarray([float(abnormal_priors[str(label)]) for label in CLASS_VALUES[1:]], dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Abnormal class priors must be finite numeric values") from exc
+    if not np.all(np.isfinite(priors)):
+        raise ValueError("Abnormal class priors must be finite numeric values")
+    if np.any(priors < 0.0):
+        raise ValueError("Abnormal class priors must be non-negative")
+
+    prior_sum = float(priors.sum())
+    if prior_sum <= 0.0:
+        raise ValueError("Abnormal class priors must have a positive sum")
+    return priors / prior_sum
+
+
+def validate_base_weights(base_weights: dict[str, float]) -> dict[str, float]:
+    missing = [name for name in MODEL_NAMES if name not in base_weights]
+    if missing:
+        raise ValueError(f"Missing ensemble base weights for models: {missing}")
+
+    try:
+        weights = {name: float(base_weights[name]) for name in MODEL_NAMES}
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Ensemble base weights must be finite numeric values") from exc
+    values = np.asarray(list(weights.values()), dtype=float)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Ensemble base weights must be finite numeric values")
+    if np.any(values < 0.0):
+        raise ValueError("Ensemble base weights must be non-negative")
+    if float(values.sum()) <= 0.0:
+        raise ValueError("Ensemble base weights must have a positive sum")
+    return weights
+
+
 def normalize_proba(proba: np.ndarray) -> np.ndarray:
     proba = np.asarray(proba, dtype=float)
     row_sum = proba.sum(axis=1, keepdims=True)
@@ -81,8 +120,7 @@ def isolation_forest_class_proba(
 ) -> np.ndarray:
     z_if = isolation_anomaly_logit(decision_scores, if_config["threshold"], if_config["scale"])
     anomaly_prob = calibrated_anomaly_probability(z_if, calibration)
-    priors = np.asarray([float(abnormal_priors[str(label)]) for label in CLASS_VALUES[1:]], dtype=float)
-    priors = priors / priors.sum()
+    priors = validate_abnormal_priors(abnormal_priors)
 
     proba = np.zeros((len(anomaly_prob), len(CLASS_VALUES)), dtype=float)
     proba[:, 0] = 1.0 - anomaly_prob
@@ -117,15 +155,21 @@ def entropy_weighted_ensemble(
     missing = [name for name in MODEL_NAMES if name not in probabilities]
     if missing:
         raise ValueError(f"Missing model probabilities for ensemble: {missing}")
+    weights = validate_base_weights(base_weights)
+    epsilon = float(epsilon)
+    if not math.isfinite(epsilon) or epsilon < 0.0:
+        raise ValueError("Entropy epsilon must be a finite non-negative value")
 
     normalized = {name: normalize_proba(probabilities[name]) for name in MODEL_NAMES}
     entropies = {name: normalized_entropy(normalized[name]) for name in MODEL_NAMES}
     confidence = {name: 1.0 - entropies[name] for name in MODEL_NAMES}
 
     numerator = {
-        name: float(base_weights[name]) * (float(epsilon) + confidence[name]) for name in MODEL_NAMES
+        name: weights[name] * (epsilon + confidence[name]) for name in MODEL_NAMES
     }
     denominator = sum(numerator.values())
+    if not np.all(np.isfinite(denominator)) or np.any(denominator <= 1e-12):
+        raise ValueError("Entropy-weighted ensemble denominator must be finite and positive")
     dynamic_weights = {name: numerator[name] / denominator for name in MODEL_NAMES}
 
     final = np.zeros_like(normalized["xgboost"], dtype=float)
