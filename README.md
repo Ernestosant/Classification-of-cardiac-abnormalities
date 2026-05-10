@@ -1,57 +1,162 @@
-# Context
-The repository contains code and resources for a project aimed at classifying different types of cardiac abnormalities using ECG signals. The project focuses on developing automated systems capable of detecting abnormalities in ECG signals, which are essential for constant monitoring of patients. The main goal of this project is to build a robust classification model using machine learning methods.
+# ECG5000 Cardiac Abnormality Classification
 
+![Python](https://img.shields.io/badge/python-3.11+-blue)
+![Task](https://img.shields.io/badge/task-ECG5000%205--class%20classification-green)
+![Inference](https://img.shields.io/badge/inference-CPU--only-lightgrey)
+![Status](https://img.shields.io/badge/status-research%20project-orange)
 
-![](Capture.PNG)
+This repository presents a reproducible research pipeline for classifying
+ECG5000 heartbeat segments into five cardiac classes. The system compares an
+InceptionTime neural model, a class-aware XGBoost classifier, an Isolation
+Forest anomaly detector, and a validation-selected ensemble.
 
-# Dataset
-We will use the dataset [ECG5000](https://timeseriesclassification.com/description.php?Dataset=ECG5000) with 7600 training data and 1900 test data.
+The emphasis is not inflated accuracy. The project prioritizes leakage-safe
+evaluation, transparent model selection, minority-class reporting, and simple
+CPU-only inference.
 
-Each data contains a cardiac cycle with 140 samples, and that can belong to one of 5 categories:
+> This is a research and education project. It is not a clinically validated
+> diagnostic tool and must not be used for medical decision-making.
 
-1. Normal
-2. Abnormal: premature ventricular contraction
-3. Abnormal: premature supraventricular contraction
-4. Abnormal: ectopic beat
-5. Abnormal: but unknown pathology
+## Highlights
 
-![](https://drive.google.com/uc?export=view&id=1x_sUD1rbM4MM4--s9D4wacRIWEo8aAzL)
+| Area | What this project does |
+|---|---|
+| Dataset | ECG5000, 140 time samples per heartbeat, five labels |
+| Supervised models | InceptionTime and XGBoost |
+| Anomaly model | Isolation Forest trained only on normal beats |
+| Ensemble | Validation-selected probability ensemble with anomaly signal support |
+| Evaluation | Official ECG5000 test split reserved for final evaluation |
+| Inference | Batch CLI and minimal Gradio app, both CPU-only |
+| Documentation | Full English docs in [`docs/index.md`](docs/index.md) |
 
-The problem with the ECG5000 set is that it contains 4427 normal data and 3173 abnormal data, that is, it is unbalanced.
+## Current Test Results
 
-In fact, for certain abnormal categories (2 to 5) there are very few data:
+Final metrics were computed once on the official ECG5000 test split after
+validation-based model selection.
 
-| Category    |  Samples|
-|-------------|------------|
-| 1 (normal)  | 4427       |
-| 2 (abnormal) | 2683       |
-| 3 (abnormal) | 149        |
-| 4 (abnormal) | 306        |
-| 5 (abnormal) | 35         |
+| Model | Accuracy | Macro-F1 | Balanced accuracy | Notes |
+|---|---:|---:|---:|---|
+| XGBoost | 0.9863 | 0.9092 | 0.8840 | Strongest supervised model |
+| InceptionTime | 0.9021 | 0.6078 | 0.7509 | Trained on Kaggle GPU, reported separately |
+| Isolation Forest | 0.9363 | 0.9353 | 0.9440 | Binary normal-vs-anomaly evaluation |
+| Ensemble | 0.9863 | 0.9092 | 0.8840 | Validation selected XGBoost weight 1.00 |
 
+See the curated results page at
+[`docs/results/model-results.md`](docs/results/model-results.md) and the
+generated report at [`reports/model_results.md`](reports/model_results.md).
 
-We can see that the critical case is category 5 with only 35 samples. We need an approach capable of correctly classifying these data.
+## System Overview
 
-# Requirements
-1. numpy
-2. fastai
-3. sklearn
-4. matplotlib.pyplot
-5. imblearn
-6. tsai
-7. pandas
-8. seaborn
+```mermaid
+flowchart LR
+    A["ECG5000 CSV files"] --> B["Strict train / validation / test protocol"]
+    B --> C["Scaler fitted only on inner training split"]
+    C --> D["XGBoost classifier"]
+    C --> E["InceptionTime classifier"]
+    C --> F["Isolation Forest anomaly detector"]
+    D --> G["Validation-selected ensemble"]
+    E --> G
+    F --> G
+    G --> H["CPU-only CLI and Gradio inference"]
+    G --> I["Reports and confusion matrices"]
+```
 
+## Quick Start
 
-# Models
-The repository includes a Jupyter Notebook that provides a step-by-step implementation of the classification pipeline [here](Classifying_cardiac_abnormalities_with_inception_time.ipynb). It covers data exploration, preprocessing, model training using the [Inception Time architecture]((https://towardsdatascience.com/deep-learning-for-time-series-classification-inceptiontime-245703f422db)), and evaluation of the model's performance. Additionally, an alternative approach using the EasyEnsemble algorithm with a Random Forest classifier is also presented for comparison. The model got an accurracy of 94.12. It is available for download in the [inception_time_1.pkl](inception_time_1.pkl) file.
+Create an environment and install the core dependencies:
 
-# Try the model
-To test the implemented models you should download the file [inception_time_1.pkl](inception_time_1.pkl) and [app.py](app.py). Put them in the same folder and run the app.py script. This will display a gradio interface on a localhost for easy use of the model.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
 
+Train the local models, select the ensemble, and regenerate the report:
 
+```powershell
+python -m src.train_xgboost
+python -m src.train_isolation_forest
+python -m src.train_ensemble
+python -m src.evaluate
+```
 
+For InceptionTime support, install the optional dependencies:
 
+```powershell
+pip install -r requirements-inception.txt
+```
 
+Retrain InceptionTime on Kaggle GPU and copy the exported CPU artifact locally:
 
+```powershell
+python scripts\run_kaggle_inception.py --submit --wait --download --copy-artifacts
+python -m src.train_ensemble
+python -m src.evaluate
+```
 
+Run CPU-only batch inference:
+
+```powershell
+python -m src.predict --input path\to\beats.csv --output predictions.csv
+```
+
+Separate InceptionTime columns are skipped by default for fast CPU inference.
+Add `--include-inception` only when you explicitly want that slower neural
+baseline output.
+
+Launch the simple Gradio interface:
+
+```powershell
+python app.py
+```
+
+## Dataset Classes
+
+| Label | Meaning |
+|---:|---|
+| 1 | Normal |
+| 2 | Premature ventricular contraction |
+| 3 | Premature supraventricular contraction |
+| 4 | Ectopic beat |
+| 5 | Unknown abnormal pathology |
+
+## Documentation
+
+Start with [`docs/index.md`](docs/index.md). The documentation is organized for
+three common reading paths:
+
+- Reviewers: project overview, results, limitations.
+- Researchers: experimental protocol, preprocessing, model methodology.
+- Implementers: setup, training, inference, troubleshooting.
+
+Key pages:
+
+- [`docs/methodology/experimental-protocol.md`](docs/methodology/experimental-protocol.md)
+- [`docs/models/ensemble.md`](docs/models/ensemble.md)
+- [`docs/reproducibility/training.md`](docs/reproducibility/training.md)
+- [`docs/reproducibility/inference.md`](docs/reproducibility/inference.md)
+- [`docs/ethics-and-limitations.md`](docs/ethics-and-limitations.md)
+
+## Repository Layout
+
+```text
+dataset/             ECG5000 train and test CSV files
+src/                 Training, evaluation, inference, metrics, and artifact code
+kaggle_inception/    Kaggle GPU script for InceptionTime retraining
+scripts/             Automation helpers
+models/              Saved model artifacts
+reports/             Generated metrics and confusion matrices
+docs/                Human-readable project documentation
+tests/               Leakage and pipeline guard tests
+```
+
+## Reproducibility Principles
+
+- The official test split is never used for preprocessing, early stopping,
+  threshold selection, or ensemble selection.
+- The scaler is fitted only on the inner training fold.
+- XGBoost uses class-aware sample weights computed from training labels only.
+- Isolation Forest is trained only on normal class samples.
+- InceptionTime is reported honestly even when the final ensemble assigns it
+  zero weight.
+- CPU-only inference loads saved artifacts and performs no fitting.

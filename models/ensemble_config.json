@@ -1,0 +1,15 @@
+{
+  "seed": 42,
+  "selection_metric": "validation macro_f1, tie-breaker balanced_accuracy",
+  "supervised_sources": {
+    "xgboost": 1.0
+  },
+  "candidate_supervised_sources": {
+    "xgboost": 1.0,
+    "inception": 0.0
+  },
+  "isolation_gamma": 0.0,
+  "isolation_status": "loaded",
+  "inception_status": "loaded",
+  "test_set_used_for_selection": false
+}

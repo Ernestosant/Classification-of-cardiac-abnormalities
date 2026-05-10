@@ -1,40 +1,46 @@
-from fastai.learner import load_learner
-import numpy as np
+from __future__ import annotations
+
+import os
+
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+
 import pandas as pd
-from tsai.all import*
-from fastai.tabular.all import *
-from sklearn.preprocessing import MinMaxScaler
-import gradio as gr
 
-model = load_learner('inception_time_1.pkl')
-# inference fucntion
-def inference(model, x_test):  
-  min_max_scaler = MinMaxScaler()
-  x_test = min_max_scaler.fit_transform(x_test)
-  x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1],1))
-  x_test = np.transpose(x_test, (0, 2, 1))
-  id = np.linspace(1, x_test.shape[0], x_test.shape[0]).astype('int')
-  dls = model.dls.test_dl(itemify(x_test, id))
-  preds, _ =  model.get_preds(dl=dls)
-  final_preds = preds.argmax(dim=1)+1
-  results = pd.DataFrame()
-  results['ID']=id
-  results['Results']=final_preds
+try:
+    import gradio as gr
+except ImportError as exc:  # pragma: no cover - user-facing dependency guard
+    raise SystemExit(
+        "Gradio is required to run the interface. Install dependencies with: "
+        "pip install -r requirements.txt"
+    ) from exc
 
-  return results
+from src.inference import predict_file_to_dataframe
 
-def load_csv(file_p):   
-    df = pd.read_csv(file_p.name)    
-    return df
 
-file_comp = gr.components.File(label="Load csv file")
+def predict_csv(file_obj, include_inception):
+    if file_obj is None:
+        return pd.DataFrame(), "Load a CSV file first."
+    try:
+        predictions, notes = predict_file_to_dataframe(file_obj.name, include_inception=include_inception)
+        return predictions, "\n".join(notes) if notes else "Prediction completed."
+    except Exception as exc:
+        return pd.DataFrame(), f"Error: {exc}"
 
-def get_predictions(file_p):
-  x_test = load_csv(file_p)
-  results = inference(model, x_test)
-  return results
-dataframe = gr.components.DataFrame()
 
-demo = gr.Interface(fn=get_predictions, inputs=file_comp, outputs=[dataframe])
+demo = gr.Interface(
+    fn=predict_csv,
+    inputs=[
+        gr.File(label="ECG CSV"),
+        gr.Checkbox(label="Include InceptionTime columns (slow on CPU)", value=False),
+    ],
+    outputs=[
+        gr.DataFrame(label="Predictions"),
+        gr.Textbox(label="Notes", lines=4),
+    ],
+    title="ECG5000 Ensemble Inference",
+    flagging_mode="never",
+)
 
-demo.launch()
+
+if __name__ == "__main__":
+    demo.launch()

@@ -1,0 +1,214 @@
+{
+  "metadata": {
+    "generated_at": "2026-05-10T16:49:09",
+    "train_samples": 7600,
+    "validation_samples": 1520,
+    "test_samples": 1900,
+    "test_used_for_model_selection": false,
+    "scaler_fit_scope": "inner training split only"
+  },
+  "xgboost_test": {
+    "accuracy": 0.9863157894736843,
+    "macro_f1": 0.9091828599541456,
+    "balanced_accuracy": 0.8840402922287712,
+    "macro_precision": 0.9563134978229317,
+    "macro_recall": 0.8840402922287712,
+    "classification_report": {
+      "Normal": {
+        "precision": 1.0,
+        "recall": 0.9946380697050938,
+        "f1-score": 0.9973118279569892,
+        "support": 1119.0
+      },
+      "PVC": {
+        "precision": 0.9738751814223512,
+        "recall": 0.9955489614243324,
+        "f1-score": 0.9845928099779897,
+        "support": 674.0
+      },
+      "Supraventricular premature beat": {
+        "precision": 0.8461538461538461,
+        "recall": 1.0,
+        "f1-score": 0.9166666666666666,
+        "support": 33.0
+      },
+      "Ectopic beat": {
+        "precision": 0.9615384615384616,
+        "recall": 0.7936507936507936,
+        "f1-score": 0.8695652173913043,
+        "support": 63.0
+      },
+      "Unknown abnormal pathology": {
+        "precision": 1.0,
+        "recall": 0.6363636363636364,
+        "f1-score": 0.7777777777777778,
+        "support": 11.0
+      },
+      "accuracy": 0.9863157894736843,
+      "macro avg": {
+        "precision": 0.9563134978229317,
+        "recall": 0.8840402922287712,
+        "f1-score": 0.9091828599541456,
+        "support": 1900.0
+      },
+      "weighted avg": {
+        "precision": 0.9867851959361393,
+        "recall": 0.9863157894736843,
+        "f1-score": 0.9858924492948653,
+        "support": 1900.0
+      }
+    }
+  },
+  "isolation_forest_test": {
+    "accuracy": 0.9363157894736842,
+    "macro_f1": 0.9353092479636764,
+    "balanced_accuracy": 0.9440000961165482,
+    "normal_specificity": 0.900804289544236,
+    "anomaly_recall": 0.9871959026888605,
+    "classification_report": {
+      "normal": {
+        "precision": 0.9901768172888016,
+        "recall": 0.900804289544236,
+        "f1-score": 0.943378568086102,
+        "support": 1119.0
+      },
+      "anomaly": {
+        "precision": 0.8741496598639455,
+        "recall": 0.9871959026888605,
+        "f1-score": 0.9272399278412508,
+        "support": 781.0
+      },
+      "accuracy": 0.9363157894736842,
+      "macro avg": {
+        "precision": 0.9321632385763736,
+        "recall": 0.9440000961165482,
+        "f1-score": 0.9353092479636764,
+        "support": 1900.0
+      },
+      "weighted avg": {
+        "precision": 0.9424835488946898,
+        "recall": 0.9363157894736842,
+        "f1-score": 0.93674473754335,
+        "support": 1900.0
+      }
+    },
+    "config": {
+      "threshold": 0.0050440744885245255,
+      "scale": 0.0908041049372669,
+      "score_rule": "decision_function <= threshold means anomaly",
+      "trained_only_on_label": 1,
+      "seed": 42
+    }
+  },
+  "inception_test": {
+    "accuracy": 0.9021052631578947,
+    "macro_f1": 0.607813566608266,
+    "balanced_accuracy": 0.7508925317669878,
+    "macro_precision": 0.5574999122711091,
+    "macro_recall": 0.7508925317669878,
+    "classification_report": {
+      "Normal": {
+        "precision": 0.9981042654028436,
+        "recall": 0.9410187667560321,
+        "f1-score": 0.968721251149954,
+        "support": 1119.0
+      },
+      "PVC": {
+        "precision": 0.959546925566343,
+        "recall": 0.8798219584569733,
+        "f1-score": 0.9179566563467493,
+        "support": 674.0
+      },
+      "Supraventricular premature beat": {
+        "precision": 0.34146341463414637,
+        "recall": 0.8484848484848485,
+        "f1-score": 0.48695652173913045,
+        "support": 33.0
+      },
+      "Ectopic beat": {
+        "precision": 0.3008849557522124,
+        "recall": 0.5396825396825397,
+        "f1-score": 0.38636363636363635,
+        "support": 63.0
+      },
+      "Unknown abnormal pathology": {
+        "precision": 0.1875,
+        "recall": 0.5454545454545454,
+        "f1-score": 0.27906976744186046,
+        "support": 11.0
+      },
+      "accuracy": 0.9021052631578947,
+      "macro avg": {
+        "precision": 0.5574999122711091,
+        "recall": 0.7508925317669878,
+        "f1-score": 0.607813566608266,
+        "support": 1900.0
+      },
+      "weighted avg": {
+        "precision": 0.945210445112007,
+        "recall": 0.9021052631578947,
+        "f1-score": 0.9190432148235096,
+        "support": 1900.0
+      }
+    }
+  },
+  "ensemble_test": {
+    "accuracy": 0.9863157894736843,
+    "macro_f1": 0.9091828599541456,
+    "balanced_accuracy": 0.8840402922287712,
+    "macro_precision": 0.9563134978229317,
+    "macro_recall": 0.8840402922287712,
+    "classification_report": {
+      "Normal": {
+        "precision": 1.0,
+        "recall": 0.9946380697050938,
+        "f1-score": 0.9973118279569892,
+        "support": 1119.0
+      },
+      "PVC": {
+        "precision": 0.9738751814223512,
+        "recall": 0.9955489614243324,
+        "f1-score": 0.9845928099779897,
+        "support": 674.0
+      },
+      "Supraventricular premature beat": {
+        "precision": 0.8461538461538461,
+        "recall": 1.0,
+        "f1-score": 0.9166666666666666,
+        "support": 33.0
+      },
+      "Ectopic beat": {
+        "precision": 0.9615384615384616,
+        "recall": 0.7936507936507936,
+        "f1-score": 0.8695652173913043,
+        "support": 63.0
+      },
+      "Unknown abnormal pathology": {
+        "precision": 1.0,
+        "recall": 0.6363636363636364,
+        "f1-score": 0.7777777777777778,
+        "support": 11.0
+      },
+      "accuracy": 0.9863157894736843,
+      "macro avg": {
+        "precision": 0.9563134978229317,
+        "recall": 0.8840402922287712,
+        "f1-score": 0.9091828599541456,
+        "support": 1900.0
+      },
+      "weighted avg": {
+        "precision": 0.9867851959361393,
+        "recall": 0.9863157894736843,
+        "f1-score": 0.9858924492948653,
+        "support": 1900.0
+      }
+    },
+    "prediction_details": {
+      "sources_used": [
+        "xgboost"
+      ],
+      "sources_skipped": [],
+      "isolation_gamma": 0.0
+    }
+  }
+}

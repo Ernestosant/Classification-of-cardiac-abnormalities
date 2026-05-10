@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+models/checkpoints/
+reports/tmp/
+*.log
+
+# Kaggle credentials and local API config
+.kaggle/
+kaggle.json
+**/kaggle.json
+kaggle_api_extended*.log
+kaggle_outputs/

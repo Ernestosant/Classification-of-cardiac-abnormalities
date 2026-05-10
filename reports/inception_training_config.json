@@ -1,0 +1,18 @@
+{
+  "seed": 42,
+  "validation_size": 0.2,
+  "epochs_requested": 40,
+  "early_stopping_patience": 8,
+  "learning_rate": 0.003,
+  "batch_size": 128,
+  "device": "Tesla P100-PCIE-16GB",
+  "test_set_used": false,
+  "scaler_fit_scope": "inner training split only",
+  "class_weighted_loss": true,
+  "recorder_values": [
+    [
+      0.6408219337463379,
+      0.8986842036247253
+    ]
+  ]
+}
