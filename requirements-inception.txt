@@ -1,0 +1,5 @@
+torch>=2.0
+fastai>=2.7,<2.9
+tsai>=0.4,<0.5
+fastprogress>=1.0,<1.1
+starlette>=0.40,<0.47

@@ -1,0 +1,70 @@
+{
+  "accuracy": 0.8986842105263158,
+  "macro_f1": 0.6118347086912014,
+  "balanced_accuracy": 0.7588914644124269,
+  "macro_precision": 0.5630113070311676,
+  "macro_recall": 0.7588914644124269,
+  "classification_report": {
+    "Normal": {
+      "precision": 0.9976019184652278,
+      "recall": 0.9401129943502825,
+      "f1-score": 0.9680046538685282,
+      "support": 885.0
+    },
+    "PVC": {
+      "precision": 0.9595141700404858,
+      "recall": 0.88268156424581,
+      "f1-score": 0.9194956353055286,
+      "support": 537.0
+    },
+    "Supraventricular premature beat": {
+      "precision": 0.3387096774193548,
+      "recall": 0.7,
+      "f1-score": 0.45652173913043476,
+      "support": 30.0
+    },
+    "Ectopic beat": {
+      "precision": 0.3269230769230769,
+      "recall": 0.5573770491803278,
+      "f1-score": 0.4121212121212121,
+      "support": 61.0
+    },
+    "Unknown abnormal pathology": {
+      "precision": 0.19230769230769232,
+      "recall": 0.7142857142857143,
+      "f1-score": 0.30303030303030304,
+      "support": 7.0
+    },
+    "accuracy": 0.8986842105263158,
+    "macro avg": {
+      "precision": 0.5630113070311676,
+      "recall": 0.7588914644124269,
+      "f1-score": 0.6118347086912014,
+      "support": 1520.0
+    },
+    "weighted avg": {
+      "precision": 0.9405174730358616,
+      "recall": 0.8986842105263158,
+      "f1-score": 0.9154010085968654,
+      "support": 1520.0
+    }
+  },
+  "metadata": {
+    "seed": 42,
+    "validation_size": 0.2,
+    "epochs_requested": 40,
+    "early_stopping_patience": 8,
+    "learning_rate": 0.003,
+    "batch_size": 128,
+    "device": "Tesla P100-PCIE-16GB",
+    "test_set_used": false,
+    "scaler_fit_scope": "inner training split only",
+    "class_weighted_loss": true,
+    "recorder_values": [
+      [
+        0.6408219337463379,
+        0.8986842036247253
+      ]
+    ]
+  }
+}

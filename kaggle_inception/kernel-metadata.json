@@ -1,0 +1,15 @@
+{
+  "id": "ernestosantiesteban/ecg5000-inceptiontime-training",
+  "title": "ECG5000 InceptionTime Training",
+  "code_file": "train_inception_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

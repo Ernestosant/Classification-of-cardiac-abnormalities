@@ -1,0 +1,7 @@
+{
+  "seed": 42,
+  "model": "XGBClassifier",
+  "best_iteration": 795,
+  "best_score": 0.06650305445949159,
+  "labels_are_saved_as": "model classes 0-4 correspond to ECG5000 labels 1-5"
+}

@@ -1,0 +1,54 @@
+# Repository Structure
+
+The repository separates source code, model artifacts, generated reports, and
+human-readable documentation.
+
+## Top-Level Folders
+
+| Path | Purpose |
+|---|---|
+| `dataset/` | Official ECG5000 train and test CSV files |
+| `src/` | Training, evaluation, inference, metrics, and artifact code |
+| `kaggle_inception/` | Kaggle GPU script and metadata for InceptionTime retraining |
+| `scripts/` | Utility scripts, including Kaggle submission/download automation |
+| `models/` | Saved model and preprocessing artifacts |
+| `reports/` | Generated metrics, Markdown report, and confusion matrices |
+| `docs/` | Structured English project documentation |
+| `tests/` | Guard tests for splitting, preprocessing, and inference behavior |
+
+## Source Code Organization
+
+| Module | Responsibility |
+|---|---|
+| `src.data` | Dataset loading and inference CSV validation |
+| `src.artifacts` | Split creation, scaler fitting/loading, directory creation |
+| `src.train_xgboost` | XGBoost training with validation and class weighting |
+| `src.train_isolation_forest` | Normal-only Isolation Forest training |
+| `src.train_inception` | Local InceptionTime training entry point |
+| `src.train_ensemble` | Validation-only ensemble selection |
+| `src.evaluate` | Final test evaluation and report generation |
+| `src.inference` | CPU-only prediction utilities |
+| `src.inception_adapter` | FastAI/tsai learner loading for CPU inference |
+| `src.predict` | Batch inference command-line interface |
+
+## Generated Artifacts
+
+| Artifact | Description |
+|---|---|
+| `models/scaler.joblib` | MinMaxScaler fitted on the inner training split |
+| `models/split_indices.joblib` | Stratified inner train/validation split |
+| `models/xgboost_model.json` | Trained XGBoost model |
+| `models/isolation_forest.joblib` | Trained Isolation Forest |
+| `models/isolation_forest_config.json` | Threshold and anomaly score configuration |
+| `models/inception_cpu.pkl` | Exported InceptionTime learner for CPU inference |
+| `models/ensemble_config.json` | Frozen validation-selected ensemble configuration |
+| `reports/model_results.md` | Generated model report |
+| `reports/metrics_*.json` | Machine-readable metrics |
+| `reports/confusion_matrix_*.png` | Validation and test confusion matrices |
+
+## Files That Should Not Be Committed
+
+Kaggle credentials and local runtime outputs should stay outside version
+control. The repository `.gitignore` excludes `.kaggle/`, `kaggle.json`,
+nested `kaggle.json` files, Kaggle logs, and temporary report outputs.
+
