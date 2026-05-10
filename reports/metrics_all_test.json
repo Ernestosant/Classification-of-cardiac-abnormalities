@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-05-10T16:49:09",
+    "generated_at": "2026-05-10T17:19:11",
     "train_samples": 7600,
     "validation_samples": 1520,
     "test_samples": 1900,
@@ -153,11 +153,11 @@
     }
   },
   "ensemble_test": {
-    "accuracy": 0.9863157894736843,
-    "macro_f1": 0.9091828599541456,
-    "balanced_accuracy": 0.8840402922287712,
-    "macro_precision": 0.9563134978229317,
-    "macro_recall": 0.8840402922287712,
+    "accuracy": 0.9852631578947368,
+    "macro_f1": 0.8971480764637032,
+    "balanced_accuracy": 0.8834468204186822,
+    "macro_precision": 0.919512682214943,
+    "macro_recall": 0.8834468204186822,
     "classification_report": {
       "Normal": {
         "precision": 1.0,
@@ -166,49 +166,66 @@
         "support": 1119.0
       },
       "PVC": {
-        "precision": 0.9738751814223512,
-        "recall": 0.9955489614243324,
-        "f1-score": 0.9845928099779897,
+        "precision": 0.9709724238026125,
+        "recall": 0.9925816023738873,
+        "f1-score": 0.9816581071166545,
         "support": 674.0
       },
       "Supraventricular premature beat": {
-        "precision": 0.8461538461538461,
+        "precision": 0.868421052631579,
         "recall": 1.0,
-        "f1-score": 0.9166666666666666,
+        "f1-score": 0.9295774647887324,
         "support": 33.0
       },
       "Ectopic beat": {
-        "precision": 0.9615384615384616,
+        "precision": 0.9803921568627451,
         "recall": 0.7936507936507936,
-        "f1-score": 0.8695652173913043,
+        "f1-score": 0.8771929824561403,
         "support": 63.0
       },
       "Unknown abnormal pathology": {
-        "precision": 1.0,
+        "precision": 0.7777777777777778,
         "recall": 0.6363636363636364,
-        "f1-score": 0.7777777777777778,
+        "f1-score": 0.7,
         "support": 11.0
       },
-      "accuracy": 0.9863157894736843,
+      "accuracy": 0.9852631578947368,
       "macro avg": {
-        "precision": 0.9563134978229317,
-        "recall": 0.8840402922287712,
-        "f1-score": 0.9091828599541456,
+        "precision": 0.919512682214943,
+        "recall": 0.8834468204186822,
+        "f1-score": 0.8971480764637032,
         "support": 1900.0
       },
       "weighted avg": {
-        "precision": 0.9867851959361393,
-        "recall": 0.9863157894736843,
-        "f1-score": 0.9858924492948653,
+        "precision": 0.9854808262198481,
+        "recall": 0.9852631578947368,
+        "f1-score": 0.9848782704806639,
         "support": 1900.0
       }
     },
     "prediction_details": {
+      "ensemble_type": "entropy_weighted_three_model",
       "sources_used": [
-        "xgboost"
+        "xgboost",
+        "inception",
+        "isolation_forest"
       ],
-      "sources_skipped": [],
-      "isolation_gamma": 0.0
+      "base_weights": {
+        "xgboost": 0.5,
+        "inception": 0.25,
+        "isolation_forest": 0.25
+      },
+      "epsilon": 0.05,
+      "mean_entropy": {
+        "xgboost": 0.03539417243893267,
+        "inception": 0.46722090590004106,
+        "isolation_forest": 0.30634192822851136
+      },
+      "mean_dynamic_weights": {
+        "xgboost": 0.6112054345130135,
+        "inception": 0.1701845850379072,
+        "isolation_forest": 0.21860998044907926
+      }
     }
   }
 }

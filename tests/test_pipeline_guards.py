@@ -12,6 +12,11 @@ from scripts.run_kaggle_inception import safe_extract
 from src.artifacts import fit_or_load_scaler, get_or_create_split_indices
 from src.config import ENSEMBLE_CONFIG_PATH, N_TIMESTEPS
 from src.data import load_ecg5000, read_inference_csv
+from src.ensemble_formula import (
+    MODEL_NAMES,
+    entropy_weighted_ensemble,
+    isolation_forest_class_proba,
+)
 from src.inference import predict_ensemble_proba
 
 
@@ -63,31 +68,81 @@ def test_ensemble_config_does_not_use_test_for_selection():
     config = json.loads(ENSEMBLE_CONFIG_PATH.read_text(encoding="utf-8"))
 
     assert config["test_set_used_for_selection"] is False
+    if config.get("ensemble_type") == "entropy_weighted_three_model":
+        weights = config["base_weights"]
+        assert set(weights) == set(MODEL_NAMES)
+        assert all(weights[name] > 0.0 for name in MODEL_NAMES)
+        assert np.isclose(sum(weights.values()), 1.0)
 
 
-def test_ensemble_gamma_zero_does_not_load_isolation_forest(tmp_path, monkeypatch):
+def test_formula_ensemble_uses_all_three_models_and_sums_to_one(tmp_path):
     config_path = tmp_path / "ensemble_config.json"
     config_path.write_text(
         json.dumps(
             {
-                "supervised_sources": {"xgboost": 1.0},
-                "isolation_gamma": 0.0,
+                "ensemble_type": "entropy_weighted_three_model",
+                "base_weights": {"xgboost": 0.5, "inception": 0.3, "isolation_forest": 0.2},
+                "epsilon": 0.05,
+                "isolation_forest": {
+                    "calibration": {"intercept": 0.0, "coefficient": 1.0},
+                    "abnormal_class_priors": {"2": 0.7, "3": 0.1, "4": 0.15, "5": 0.05},
+                },
+                "test_set_used_for_selection": False,
             }
         ),
         encoding="utf-8",
     )
 
-    def fail_if_loaded(*_args, **_kwargs):
-        raise AssertionError("Isolation Forest should not load when gamma is zero")
-
-    monkeypatch.setattr("src.inference.load_isolation_artifacts", fail_if_loaded)
     X_scaled = np.zeros((2, N_TIMESTEPS), dtype=float)
     xgb_proba = np.asarray([[0.8, 0.2, 0.0, 0.0, 0.0], [0.1, 0.7, 0.2, 0.0, 0.0]])
+    inception_proba = np.asarray([[0.6, 0.3, 0.1, 0.0, 0.0], [0.2, 0.6, 0.1, 0.1, 0.0]])
+    if_decision = np.asarray([-1.0, 1.0])
+    if_config = {"threshold": 0.0, "scale": 1.0}
 
-    proba, details = predict_ensemble_proba(X_scaled, config_path=config_path, xgb_proba=xgb_proba)
+    proba, details = predict_ensemble_proba(
+        X_scaled,
+        config_path=config_path,
+        xgb_proba=xgb_proba,
+        inception_proba=inception_proba,
+        if_decision=if_decision,
+        if_config=if_config,
+        include_diagnostics=True,
+    )
 
-    assert np.allclose(proba, xgb_proba)
-    assert details["isolation_gamma"] == 0.0
+    assert np.allclose(proba.sum(axis=1), 1.0)
+    assert details["sources_used"] == list(MODEL_NAMES)
+    dynamic = details["per_sample_dynamic_weights"]
+    assert all(np.all(dynamic[name] > 0.0) for name in MODEL_NAMES)
+    assert np.allclose(sum(dynamic[name] for name in MODEL_NAMES), 1.0)
+
+
+def test_entropy_changes_dynamic_weights():
+    probabilities = {
+        "xgboost": np.asarray([[0.96, 0.01, 0.01, 0.01, 0.01], [0.2, 0.2, 0.2, 0.2, 0.2]]),
+        "inception": np.asarray([[0.2, 0.2, 0.2, 0.2, 0.2], [0.96, 0.01, 0.01, 0.01, 0.01]]),
+        "isolation_forest": np.asarray([[0.2, 0.2, 0.2, 0.2, 0.2], [0.2, 0.2, 0.2, 0.2, 0.2]]),
+    }
+
+    _, diagnostics = entropy_weighted_ensemble(
+        probabilities,
+        {"xgboost": 1 / 3, "inception": 1 / 3, "isolation_forest": 1 / 3},
+        epsilon=0.05,
+    )
+
+    assert diagnostics["dynamic_weights"]["xgboost"][0] > diagnostics["dynamic_weights"]["xgboost"][1]
+    assert diagnostics["dynamic_weights"]["inception"][1] > diagnostics["dynamic_weights"]["inception"][0]
+
+
+def test_isolation_forest_pseudo_probabilities_sum_to_one():
+    proba = isolation_forest_class_proba(
+        decision_scores=np.asarray([-2.0, 2.0]),
+        if_config={"threshold": 0.0, "scale": 1.0},
+        calibration={"intercept": 0.0, "coefficient": 1.0},
+        abnormal_priors={"2": 0.7, "3": 0.1, "4": 0.15, "5": 0.05},
+    )
+
+    assert np.allclose(proba.sum(axis=1), 1.0)
+    assert proba[0, 0] < proba[1, 0]
 
 
 def test_kaggle_artifact_extract_rejects_path_traversal(tmp_path):

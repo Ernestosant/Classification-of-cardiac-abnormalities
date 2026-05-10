@@ -44,9 +44,9 @@ used during training.
 | Test | 0.9021 | 0.6078 | 0.7509 |
 
 InceptionTime improved recall on some minority abnormal classes, but at the cost
-of lower precision and lower macro-F1 than XGBoost. The final ensemble therefore
-keeps InceptionTime documented as an individual model but assigns it zero weight
-in the validation-selected ensemble.
+of lower precision and lower macro-F1 than XGBoost. In the current final
+ensemble, InceptionTime contributes through a positive base weight and a
+per-sample entropy-adjusted dynamic weight.
 
 ## CPU-Only Loading
 
@@ -54,4 +54,3 @@ The inference adapter sets `CUDA_VISIBLE_DEVICES` to disable GPU use and loads
 the exported FastAI/tsai learner on CPU. The adapter also handles the Windows
 path compatibility issue that can occur when loading a learner exported from a
 Linux Kaggle environment.
-

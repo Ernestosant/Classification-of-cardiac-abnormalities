@@ -46,6 +46,9 @@ detected, it is ignored and a note is returned to the user. The output includes:
 | `xgboost_class` | XGBoost class prediction |
 | `xgboost_confidence` | Maximum XGBoost probability |
 | `inception_class` | InceptionTime prediction when artifact is available |
+| `isolation_normal_probability` | Calibrated Isolation Forest normal probability |
+| `isolation_anomaly_probability` | Calibrated Isolation Forest anomaly probability |
+| `entropy_*` | Normalized entropy for each model probability vector |
+| `dynamic_weight_*` | Per-sample entropy-adjusted ensemble weight |
 | `isolation_anomaly` | Binary anomaly decision |
 | `isolation_score` | Higher values indicate more anomalous samples |
-

@@ -41,12 +41,12 @@ accuracy.
   limited.
 - Isolation Forest detects abnormality as a binary signal and does not classify
   abnormal subtype.
-- The final ensemble reflects validation performance, not a theoretical claim
-  that one model family is always better.
+- The final ensemble intentionally trades a small amount of XGBoost-only
+  performance for a transparent multi-model formula with positive contribution
+  from all three model families.
 
 ## Responsible Interpretation
 
 The most important result is not the headline accuracy. The important claim is
 that the reported metrics come from a documented protocol that avoids obvious
 data leakage and separates model selection from final test evaluation.
-

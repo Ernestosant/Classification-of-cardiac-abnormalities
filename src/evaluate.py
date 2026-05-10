@@ -52,9 +52,11 @@ def main() -> None:
         }
     }
 
+    xgb_proba = None
     if XGBOOST_MODEL_PATH.exists():
         xgb_model = load_xgboost_model()
-        pred = xgb_model.predict(X_test_scaled) + 1
+        xgb_proba = xgb_model.predict_proba(X_test_scaled)
+        pred = xgb_proba.argmax(axis=1) + 1
         metrics = multiclass_metrics(y_test, pred)
         results["xgboost_test"] = metrics
         save_json(metrics, REPORTS_DIR / "metrics_xgboost_test.json")
@@ -67,10 +69,12 @@ def main() -> None:
     else:
         results["xgboost_test"] = {"status": "missing model"}
 
+    if_decisions = None
+    if_config = None
     try:
         if_model, if_config = load_isolation_artifacts()
-        decisions = if_model.decision_function(X_test_scaled)
-        pred_anomaly = decisions <= if_config["threshold"]
+        if_decisions = if_model.decision_function(X_test_scaled)
+        pred_anomaly = if_decisions <= if_config["threshold"]
         metrics = binary_anomaly_metrics(y_test, pred_anomaly)
         metrics["config"] = if_config
         results["isolation_forest_test"] = metrics
@@ -84,12 +88,13 @@ def main() -> None:
     except FileNotFoundError as exc:
         results["isolation_forest_test"] = {"status": str(exc)}
 
+    inception_proba = None
     inception_predictor, inception_status = load_inception_predictor()
     if inception_predictor is None:
         results["inception_test"] = {"status": inception_status}
     else:
-        proba = inception_predictor(X_test_scaled)
-        pred = proba.argmax(axis=1) + 1
+        inception_proba = inception_predictor(X_test_scaled)
+        pred = inception_proba.argmax(axis=1) + 1
         metrics = multiclass_metrics(y_test, pred)
         results["inception_test"] = metrics
         save_json(metrics, REPORTS_DIR / "metrics_inception_test.json")
@@ -101,18 +106,27 @@ def main() -> None:
         )
 
     if ENSEMBLE_CONFIG_PATH.exists():
-        proba, details = predict_ensemble_proba(X_test_scaled)
-        pred = proba.argmax(axis=1) + 1
-        metrics = multiclass_metrics(y_test, pred)
-        metrics["prediction_details"] = details
-        results["ensemble_test"] = metrics
-        save_json(metrics, REPORTS_DIR / "metrics_ensemble_test.json")
-        save_multiclass_confusion_matrix(
-            y_test,
-            pred,
-            REPORTS_DIR / "confusion_matrix_ensemble_test.png",
-            "Ensemble test confusion matrix",
-        )
+        try:
+            proba, details = predict_ensemble_proba(
+                X_test_scaled,
+                xgb_proba=xgb_proba,
+                inception_proba=inception_proba,
+                if_decision=if_decisions,
+                if_config=if_config,
+            )
+            pred = proba.argmax(axis=1) + 1
+            metrics = multiclass_metrics(y_test, pred)
+            metrics["prediction_details"] = details
+            results["ensemble_test"] = metrics
+            save_json(metrics, REPORTS_DIR / "metrics_ensemble_test.json")
+            save_multiclass_confusion_matrix(
+                y_test,
+                pred,
+                REPORTS_DIR / "confusion_matrix_ensemble_test.png",
+                "Entropy-weighted ensemble test confusion matrix",
+            )
+        except (FileNotFoundError, RuntimeError) as exc:
+            results["ensemble_test"] = {"status": str(exc)}
     else:
         results["ensemble_test"] = {"status": "missing ensemble config"}
 
@@ -161,6 +175,10 @@ def write_markdown_report(results: dict) -> None:
         "",
         _ensemble_section(),
         "",
+        "## Ensemble Diagnostics",
+        "",
+        _ensemble_diagnostics_section(results),
+        "",
         "## InceptionTime Training Notes",
         "",
         _inception_section(val_metrics),
@@ -177,7 +195,7 @@ def write_markdown_report(results: dict) -> None:
         "",
         "- ECG5000 is small for classes 3 and 5, so minority-class metrics can move substantially with a few examples.",
         "- Isolation Forest is anomaly-oriented and does not identify the exact abnormal subtype by itself.",
-        "- InceptionTime results are only included when `models/inception_cpu.pkl` exists and fastai/tsai are available.",
+        "- The formula ensemble requires `models/inception_cpu.pkl` and fastai/tsai for CPU inference.",
         "- Metrics should be interpreted as project evidence, not clinical performance claims.",
         "",
         "## Reproducibility",
@@ -251,6 +269,19 @@ def _ensemble_section() -> str:
     if not ENSEMBLE_CONFIG_PATH.exists():
         return "Ensemble configuration is not available."
     config = load_json(ENSEMBLE_CONFIG_PATH)
+    if config.get("ensemble_type") == "entropy_weighted_three_model":
+        weights = config.get("base_weights", {})
+        return (
+            f"- Ensemble type: `{config.get('ensemble_type')}`\n"
+            f"- Selection metric: `{config.get('selection_metric', 'not recorded')}`\n"
+            f"- Base weights: XGBoost `{weights.get('xgboost', 0.0):.2f}`, "
+            f"InceptionTime `{weights.get('inception', 0.0):.2f}`, "
+            f"Isolation Forest `{weights.get('isolation_forest', 0.0):.2f}`\n"
+            f"- Entropy epsilon: `{config.get('epsilon', 'not recorded')}`\n"
+            f"- Contribution policy: `{config.get('model_contribution_policy', 'not recorded')}`\n"
+            "- Test set used for ensemble selection: `false`"
+        )
+
     sources = config.get("supervised_sources", {})
     xgb_weight = sources.get("xgboost", 0.0)
     inception_weight = sources.get("inception", 0.0)
@@ -262,6 +293,32 @@ def _ensemble_section() -> str:
         f"- InceptionTime artifact status during selection: `{config.get('inception_status', 'unknown')}`\n"
         "- Test set used for ensemble selection: `false`"
     )
+
+
+def _ensemble_diagnostics_section(results: dict) -> str:
+    details = results.get("ensemble_test", {}).get("prediction_details", {})
+    base = details.get("base_weights", {})
+    entropy = details.get("mean_entropy", {})
+    dynamic = details.get("mean_dynamic_weights", {})
+    if not (base and entropy and dynamic):
+        return "Ensemble diagnostics are not available."
+    rows = [
+        "| Diagnostic | XGBoost | InceptionTime | Isolation Forest |",
+        "|---|---:|---:|---:|",
+        (
+            f"| Base weight | {base.get('xgboost', 0.0):.4f} | "
+            f"{base.get('inception', 0.0):.4f} | {base.get('isolation_forest', 0.0):.4f} |"
+        ),
+        (
+            f"| Mean test entropy | {entropy.get('xgboost', 0.0):.4f} | "
+            f"{entropy.get('inception', 0.0):.4f} | {entropy.get('isolation_forest', 0.0):.4f} |"
+        ),
+        (
+            f"| Mean test dynamic weight | {dynamic.get('xgboost', 0.0):.4f} | "
+            f"{dynamic.get('inception', 0.0):.4f} | {dynamic.get('isolation_forest', 0.0):.4f} |"
+        ),
+    ]
+    return "\n".join(rows)
 
 
 def _inception_section(val_metrics: dict) -> str:

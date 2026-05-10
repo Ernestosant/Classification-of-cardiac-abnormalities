@@ -8,7 +8,7 @@
 This repository presents a reproducible research pipeline for classifying
 ECG5000 heartbeat segments into five cardiac classes. The system compares an
 InceptionTime neural model, a class-aware XGBoost classifier, an Isolation
-Forest anomaly detector, and a validation-selected ensemble.
+Forest anomaly detector, and an entropy-weighted three-model ensemble.
 
 The emphasis is not inflated accuracy. The project prioritizes leakage-safe
 evaluation, transparent model selection, minority-class reporting, and simple
@@ -24,7 +24,7 @@ CPU-only inference.
 | Dataset | ECG5000, 140 time samples per heartbeat, five labels |
 | Supervised models | InceptionTime and XGBoost |
 | Anomaly model | Isolation Forest trained only on normal beats |
-| Ensemble | Validation-selected probability ensemble with anomaly signal support |
+| Ensemble | Entropy-weighted formula using XGBoost, InceptionTime, and Isolation Forest |
 | Evaluation | Official ECG5000 test split reserved for final evaluation |
 | Inference | Batch CLI and minimal Gradio app, both CPU-only |
 | Documentation | Full English docs in [`docs/index.md`](docs/index.md) |
@@ -39,7 +39,11 @@ validation-based model selection.
 | XGBoost | 0.9863 | 0.9092 | 0.8840 | Strongest supervised model |
 | InceptionTime | 0.9021 | 0.6078 | 0.7509 | Trained on Kaggle GPU, reported separately |
 | Isolation Forest | 0.9363 | 0.9353 | 0.9440 | Binary normal-vs-anomaly evaluation |
-| Ensemble | 0.9863 | 0.9092 | 0.8840 | Validation selected XGBoost weight 1.00 |
+| Ensemble | 0.9853 | 0.8971 | 0.8834 | All three models contribute by formula |
+
+Selected ensemble base weights are XGBoost `0.50`, InceptionTime `0.25`, and
+Isolation Forest `0.25`; per-sample normalized entropy adjusts the dynamic
+weights at inference time.
 
 See the curated results page at
 [`docs/results/model-results.md`](docs/results/model-results.md) and the
@@ -54,7 +58,7 @@ flowchart LR
     C --> D["XGBoost classifier"]
     C --> E["InceptionTime classifier"]
     C --> F["Isolation Forest anomaly detector"]
-    D --> G["Validation-selected ensemble"]
+    D --> G["Entropy-weighted formula ensemble"]
     E --> G
     F --> G
     G --> H["CPU-only CLI and Gradio inference"]
@@ -100,9 +104,9 @@ Run CPU-only batch inference:
 python -m src.predict --input path\to\beats.csv --output predictions.csv
 ```
 
-Separate InceptionTime columns are skipped by default for fast CPU inference.
-Add `--include-inception` only when you explicitly want that slower neural
-baseline output.
+The final ensemble always runs XGBoost, InceptionTime, and Isolation Forest.
+Because InceptionTime is evaluated on CPU, full-file inference is slower than
+the previous XGBoost-only fast path.
 
 Launch the simple Gradio interface:
 
@@ -157,6 +161,6 @@ tests/               Leakage and pipeline guard tests
 - The scaler is fitted only on the inner training fold.
 - XGBoost uses class-aware sample weights computed from training labels only.
 - Isolation Forest is trained only on normal class samples.
-- InceptionTime is reported honestly even when the final ensemble assigns it
-  zero weight.
+- InceptionTime and Isolation Forest both have positive base weights in the
+  final entropy-weighted ensemble.
 - CPU-only inference loads saved artifacts and performs no fitting.

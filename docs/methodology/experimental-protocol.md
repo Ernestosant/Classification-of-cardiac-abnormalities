@@ -32,10 +32,10 @@ The ensemble selection criterion is validation macro-F1, with balanced accuracy
 used as a tie-breaker. The selected configuration is saved to
 `models/ensemble_config.json` before final test evaluation.
 
-The current frozen ensemble configuration uses XGBoost with weight `1.00`.
-InceptionTime was available and evaluated, but validation selection assigned it
-weight `0.00` in the final ensemble. This is intentionally documented rather
-than hidden.
+The current frozen ensemble is an entropy-weighted three-model formula. XGBoost,
+InceptionTime, and Isolation Forest all have positive base weights, and
+per-sample entropy adjusts their dynamic contribution. Validation selects the
+positive base weights; the official test split is not used for this selection.
 
 ## Final Evaluation
 
@@ -63,4 +63,3 @@ flowchart TD
     G --> H["ECG5000_test.csv"]
     H --> I["Final metrics"]
 ```
-

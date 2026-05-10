@@ -1,15 +1,39 @@
 {
+  "ensemble_type": "entropy_weighted_three_model",
   "seed": 42,
   "selection_metric": "validation macro_f1, tie-breaker balanced_accuracy",
-  "supervised_sources": {
-    "xgboost": 1.0
+  "model_contribution_policy": "all models have positive base weights and entropy-adjusted per-sample weights",
+  "sources_required": [
+    "xgboost",
+    "inception",
+    "isolation_forest"
+  ],
+  "base_weights": {
+    "xgboost": 0.5,
+    "inception": 0.25,
+    "isolation_forest": 0.25
   },
-  "candidate_supervised_sources": {
-    "xgboost": 1.0,
-    "inception": 0.0
+  "min_beta": 0.1,
+  "weight_grid_step": 0.05,
+  "epsilon": 0.05,
+  "isolation_forest": {
+    "calibration": {
+      "method": "validation_logistic_regression",
+      "intercept": -0.10656867882627197,
+      "coefficient": 3.2098499411722017,
+      "input": "(threshold - decision_function) / scale",
+      "uses_validation_labels": true
+    },
+    "abnormal_class_priors": {
+      "2": 0.8455476753349094,
+      "3": 0.04688731284475965,
+      "4": 0.09653270291568164,
+      "5": 0.01103230890464933
+    },
+    "pseudo_probability_rule": "p_if[1]=1-a_if; p_if[c]=a_if*pi_c for c in 2..5",
+    "trained_only_on_label": 1
   },
-  "isolation_gamma": 0.0,
-  "isolation_status": "loaded",
   "inception_status": "loaded",
+  "isolation_status": "loaded",
   "test_set_used_for_selection": false
 }

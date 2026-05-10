@@ -7,15 +7,24 @@ import numpy as np
 from .artifacts import ensure_dirs, fit_or_load_scaler, get_or_create_split_indices
 from .config import ENSEMBLE_CONFIG_PATH, REPORTS_DIR, SEED
 from .data import load_ecg5000
-from .inception_adapter import load_inception_predictor
-from .inference import (
-    anomaly_confidence,
-    apply_isolation_adjustment,
-    load_isolation_artifacts,
-    load_xgboost_model,
-    normalize_proba,
+from .ensemble_formula import (
+    MODEL_NAMES,
+    abnormal_class_priors,
+    entropy_weighted_ensemble,
+    fit_isolation_calibration,
+    isolation_anomaly_logit,
+    isolation_forest_class_proba,
+    positive_base_weight_grid,
+    summarize_diagnostics,
 )
+from .inception_adapter import load_inception_predictor
+from .inference import load_isolation_artifacts, load_xgboost_model
 from .metrics import multiclass_metrics, save_json, save_multiclass_confusion_matrix
+
+
+EPSILON = 0.05
+MIN_BETA = 0.10
+WEIGHT_GRID_STEP = 0.05
 
 
 def main() -> None:
@@ -26,74 +35,75 @@ def main() -> None:
     val_idx = split["val_idx"]
     scaler = fit_or_load_scaler(X_full, train_idx)
     X_val = scaler.transform(X_full[val_idx])
+    y_train = y_full[train_idx]
     y_val = y_full[val_idx]
 
     xgb_model = load_xgboost_model()
     xgb_proba = xgb_model.predict_proba(X_val)
 
     inception_predictor, inception_status = load_inception_predictor()
-    inception_proba = inception_predictor(X_val) if inception_predictor is not None else None
+    if inception_predictor is None:
+        raise SystemExit(f"InceptionTime is required for the formula ensemble: {inception_status}")
+    inception_proba = inception_predictor(X_val)
 
-    try:
-        if_model, if_config = load_isolation_artifacts()
-        decisions = if_model.decision_function(X_val)
-        anomaly_conf = anomaly_confidence(decisions, if_config["threshold"], if_config["scale"])
-        gamma_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4]
-        isolation_status = "loaded"
-    except FileNotFoundError as exc:
-        anomaly_conf = np.zeros(len(y_val), dtype=float)
-        gamma_values = [0.0]
-        isolation_status = (
-            f"missing Isolation Forest artifacts: {exc}. "
-            "Skipped anomaly adjustment; run python -m src.train_isolation_forest to enable it."
-        )
+    if_model, if_config = load_isolation_artifacts()
+    if_decisions = if_model.decision_function(X_val)
+    if_z = isolation_anomaly_logit(if_decisions, if_config["threshold"], if_config["scale"])
+    if_calibration = fit_isolation_calibration(if_z, y_val)
+    abnormal_priors = abnormal_class_priors(y_train)
+    if_proba = isolation_forest_class_proba(if_decisions, if_config, if_calibration, abnormal_priors)
 
-    supervised_candidates = []
-    if inception_proba is None:
-        supervised_candidates.append(({"xgboost": 1.0}, xgb_proba))
-    else:
-        for xgb_weight in [0.0, 0.25, 0.5, 0.75, 1.0]:
-            inc_weight = 1.0 - xgb_weight
-            proba = normalize_proba(xgb_weight * xgb_proba + inc_weight * inception_proba)
-            supervised_candidates.append(({"xgboost": xgb_weight, "inception": inc_weight}, proba))
+    probabilities = {
+        "xgboost": xgb_proba,
+        "inception": inception_proba,
+        "isolation_forest": if_proba,
+    }
 
     best = {
         "macro_f1": -1.0,
         "balanced_accuracy": -1.0,
-        "isolation_gamma": None,
-        "supervised_sources": None,
+        "base_weights": None,
         "pred": None,
+        "proba": None,
+        "diagnostics": None,
     }
-    for sources, supervised_proba in supervised_candidates:
-        for gamma in gamma_values:
-            ensemble_proba = apply_isolation_adjustment(supervised_proba, anomaly_conf, gamma)
-            pred = ensemble_proba.argmax(axis=1) + 1
-            metrics = multiclass_metrics(y_val, pred)
-            if (metrics["macro_f1"] > best["macro_f1"]) or (
-                np.isclose(metrics["macro_f1"], best["macro_f1"])
-                and metrics["balanced_accuracy"] > best["balanced_accuracy"]
-            ):
-                best.update(
-                    {
-                        "macro_f1": metrics["macro_f1"],
-                        "balanced_accuracy": metrics["balanced_accuracy"],
-                        "isolation_gamma": gamma,
-                        "supervised_sources": sources,
-                        "pred": pred,
-                    }
-                )
+    for base_weights in positive_base_weight_grid(min_beta=MIN_BETA, step=WEIGHT_GRID_STEP):
+        ensemble_proba, diagnostics = entropy_weighted_ensemble(probabilities, base_weights, EPSILON)
+        pred = ensemble_proba.argmax(axis=1) + 1
+        metrics = multiclass_metrics(y_val, pred)
+        if (metrics["macro_f1"] > best["macro_f1"]) or (
+            np.isclose(metrics["macro_f1"], best["macro_f1"])
+            and metrics["balanced_accuracy"] > best["balanced_accuracy"]
+        ):
+            best.update(
+                {
+                    "macro_f1": metrics["macro_f1"],
+                    "balanced_accuracy": metrics["balanced_accuracy"],
+                    "base_weights": base_weights,
+                    "pred": pred,
+                    "proba": ensemble_proba,
+                    "diagnostics": diagnostics,
+                }
+            )
 
-    selected_sources = {
-        name: weight for name, weight in best["supervised_sources"].items() if float(weight) > 0.0
-    }
     config = {
+        "ensemble_type": "entropy_weighted_three_model",
         "seed": SEED,
         "selection_metric": "validation macro_f1, tie-breaker balanced_accuracy",
-        "supervised_sources": selected_sources,
-        "candidate_supervised_sources": best["supervised_sources"],
-        "isolation_gamma": best["isolation_gamma"],
-        "isolation_status": isolation_status,
+        "model_contribution_policy": "all models have positive base weights and entropy-adjusted per-sample weights",
+        "sources_required": list(MODEL_NAMES),
+        "base_weights": best["base_weights"],
+        "min_beta": MIN_BETA,
+        "weight_grid_step": WEIGHT_GRID_STEP,
+        "epsilon": EPSILON,
+        "isolation_forest": {
+            "calibration": if_calibration,
+            "abnormal_class_priors": abnormal_priors,
+            "pseudo_probability_rule": "p_if[1]=1-a_if; p_if[c]=a_if*pi_c for c in 2..5",
+            "trained_only_on_label": 1,
+        },
         "inception_status": inception_status,
+        "isolation_status": "loaded",
         "test_set_used_for_selection": False,
     }
     with ENSEMBLE_CONFIG_PATH.open("w", encoding="utf-8") as f:
@@ -101,17 +111,19 @@ def main() -> None:
 
     metrics = multiclass_metrics(y_val, best["pred"])
     metrics["ensemble_config"] = config
+    metrics["diagnostics"] = summarize_diagnostics(best["diagnostics"])
     save_json(metrics, REPORTS_DIR / "metrics_ensemble_validation.json")
     save_multiclass_confusion_matrix(
         y_val,
         best["pred"],
         REPORTS_DIR / "confusion_matrix_ensemble_validation.png",
-        "Ensemble validation confusion matrix",
+        "Entropy-weighted ensemble validation confusion matrix",
     )
     print(f"Saved ensemble config to {ENSEMBLE_CONFIG_PATH}")
     print(f"Validation macro-F1: {metrics['macro_f1']:.4f}")
+    print(f"Base weights: {best['base_weights']}")
     print(f"Inception status: {inception_status}")
-    print(f"Isolation Forest status: {isolation_status}")
+    print("Isolation Forest status: loaded")
 
 
 if __name__ == "__main__":

@@ -12,7 +12,6 @@ from xgboost import XGBClassifier
 
 from .config import (
     CLASS_NAMES,
-    CLASS_VALUES,
     ENSEMBLE_CONFIG_PATH,
     IFOREST_CONFIG_PATH,
     IFOREST_MODEL_PATH,
@@ -20,6 +19,12 @@ from .config import (
     XGBOOST_MODEL_PATH,
 )
 from .data import read_inference_csv
+from .ensemble_formula import (
+    MODEL_NAMES,
+    entropy_weighted_ensemble,
+    isolation_forest_class_proba,
+    summarize_diagnostics,
+)
 from .inception_adapter import load_inception_predictor
 
 
@@ -66,89 +71,60 @@ def load_ensemble_config(path: Path = ENSEMBLE_CONFIG_PATH) -> dict:
         return json.load(f)
 
 
-def anomaly_confidence(decision_scores: np.ndarray, threshold: float, scale: float) -> np.ndarray:
-    scale = max(float(scale), 1e-6)
-    logits = (threshold - decision_scores) / scale
-    return 1.0 / (1.0 + np.exp(-np.clip(logits, -40, 40)))
-
-
-def apply_isolation_adjustment(proba: np.ndarray, anomaly_conf: np.ndarray, gamma: float) -> np.ndarray:
-    adjusted = np.asarray(proba, dtype=float).copy()
-    gamma = float(gamma)
-    if gamma <= 0:
-        return normalize_proba(adjusted)
-
-    shift = adjusted[:, 0] * gamma * anomaly_conf
-    adjusted[:, 0] = np.maximum(adjusted[:, 0] - shift, 0.0)
-
-    abnormal = adjusted[:, 1:]
-    abnormal_sum = abnormal.sum(axis=1, keepdims=True)
-    fallback = np.full_like(abnormal, 1.0 / (len(CLASS_VALUES) - 1))
-    weights = np.divide(abnormal, abnormal_sum, out=fallback, where=abnormal_sum > 1e-12)
-    adjusted[:, 1:] += shift[:, None] * weights
-    return normalize_proba(adjusted)
-
-
-def normalize_proba(proba: np.ndarray) -> np.ndarray:
-    row_sum = proba.sum(axis=1, keepdims=True)
-    return np.divide(proba, row_sum, out=np.full_like(proba, 1.0 / proba.shape[1]), where=row_sum > 1e-12)
-
-
 def predict_ensemble_proba(
     X_scaled: np.ndarray,
     config_path: Path = ENSEMBLE_CONFIG_PATH,
     xgb_proba: np.ndarray | None = None,
+    inception_proba: np.ndarray | None = None,
     if_decision: np.ndarray | None = None,
     if_config: dict | None = None,
+    include_diagnostics: bool = False,
 ) -> tuple[np.ndarray, dict]:
     config = load_ensemble_config(config_path)
+    if config.get("ensemble_type") != "entropy_weighted_three_model":
+        raise RuntimeError("Unsupported or legacy ensemble config. Run `python -m src.train_ensemble` first.")
 
-    sources = config["supervised_sources"]
-    probas = []
-    weights = []
-    details = {"sources_used": [], "sources_skipped": []}
+    if xgb_proba is None:
+        xgb_model = load_xgboost_model()
+        xgb_proba = xgb_model.predict_proba(X_scaled)
 
-    xgb_weight = float(sources.get("xgboost", 0.0))
-    if xgb_weight > 0.0:
-        if xgb_proba is None:
-            xgb_model = load_xgboost_model()
-            xgb_proba = xgb_model.predict_proba(X_scaled)
-        probas.append(xgb_proba)
-        weights.append(xgb_weight)
-        details["sources_used"].append("xgboost")
-
-    inception_weight = float(sources.get("inception", 0.0))
-    if inception_weight > 0.0:
+    if inception_proba is None:
         predictor, reason = load_inception_predictor()
         if predictor is None:
-            details["sources_skipped"].append({"inception": reason})
-        else:
-            probas.append(predictor(X_scaled))
-            weights.append(inception_weight)
-            details["sources_used"].append("inception")
-
-    if not probas:
-        raise RuntimeError("No supervised model was available for ensemble prediction")
-
-    weights_arr = np.asarray(weights, dtype=float)
-    weights_arr = weights_arr / weights_arr.sum()
-    supervised = sum(weight * proba for weight, proba in zip(weights_arr, probas))
-    supervised = normalize_proba(supervised)
-
-    gamma = float(config["isolation_gamma"])
-    details["isolation_gamma"] = gamma
-    if gamma <= 0.0:
-        return supervised, details
+            raise RuntimeError(f"InceptionTime is required for the formula ensemble: {reason}")
+        inception_proba = predictor(X_scaled)
 
     if if_decision is None or if_config is None:
         if_model, if_config = load_isolation_artifacts()
         if_decision = if_model.decision_function(X_scaled)
-    anomaly_conf = anomaly_confidence(if_decision, if_config["threshold"], if_config["scale"])
-    final = apply_isolation_adjustment(supervised, anomaly_conf, gamma)
+    if_proba = isolation_forest_class_proba(
+        if_decision,
+        if_config,
+        config["isolation_forest"]["calibration"],
+        config["isolation_forest"]["abnormal_class_priors"],
+    )
+
+    probabilities = {
+        "xgboost": xgb_proba,
+        "inception": inception_proba,
+        "isolation_forest": if_proba,
+    }
+    final, diagnostics = entropy_weighted_ensemble(probabilities, config["base_weights"], config["epsilon"])
+    details = {
+        "ensemble_type": config["ensemble_type"],
+        "sources_used": list(MODEL_NAMES),
+        "base_weights": config["base_weights"],
+        "epsilon": config["epsilon"],
+        **summarize_diagnostics(diagnostics),
+    }
+    if include_diagnostics:
+        details["per_sample_entropy"] = diagnostics["entropy"]
+        details["per_sample_dynamic_weights"] = diagnostics["dynamic_weights"]
+        details["isolation_forest_proba"] = if_proba
     return final, details
 
 
-def predict_file_to_dataframe(path: str | Path, include_inception: bool = False) -> tuple[pd.DataFrame, list[str]]:
+def predict_file_to_dataframe(path: str | Path, include_inception: bool | None = None) -> tuple[pd.DataFrame, list[str]]:
     force_cpu_only()
     parsed = read_inference_csv(path)
     scaler = load_scaler()
@@ -158,6 +134,12 @@ def predict_file_to_dataframe(path: str | Path, include_inception: bool = False)
     xgb_proba = xgb_model.predict_proba(X_scaled)
     xgb_pred = xgb_proba.argmax(axis=1) + 1
 
+    inception_predictor, inception_status = load_inception_predictor()
+    if inception_predictor is None:
+        raise RuntimeError(f"InceptionTime is required for the formula ensemble: {inception_status}")
+    inception_proba = inception_predictor(X_scaled)
+    inception_pred = inception_proba.argmax(axis=1) + 1
+
     if_model, if_config = load_isolation_artifacts()
     if_decision = if_model.decision_function(X_scaled)
     is_anomaly = if_decision <= if_config["threshold"]
@@ -165,10 +147,15 @@ def predict_file_to_dataframe(path: str | Path, include_inception: bool = False)
     ensemble_proba, details = predict_ensemble_proba(
         X_scaled,
         xgb_proba=xgb_proba,
+        inception_proba=inception_proba,
         if_decision=if_decision,
         if_config=if_config,
+        include_diagnostics=True,
     )
     ensemble_pred = ensemble_proba.argmax(axis=1) + 1
+    per_sample_entropy = details["per_sample_entropy"]
+    per_sample_weights = details["per_sample_dynamic_weights"]
+    if_proba = details["isolation_forest_proba"]
 
     columns = {
         "id": np.arange(1, len(parsed.X) + 1),
@@ -177,25 +164,18 @@ def predict_file_to_dataframe(path: str | Path, include_inception: bool = False)
         "ensemble_confidence": ensemble_proba.max(axis=1),
         "xgboost_class": xgb_pred,
         "xgboost_confidence": xgb_proba.max(axis=1),
+        "inception_class": inception_pred,
+        "inception_label": [CLASS_NAMES[int(label)] for label in inception_pred],
+        "inception_confidence": inception_proba.max(axis=1),
+        "isolation_normal_probability": if_proba[:, 0],
+        "isolation_anomaly_probability": if_proba[:, 1:].sum(axis=1),
+        "entropy_xgboost": per_sample_entropy["xgboost"],
+        "entropy_inception": per_sample_entropy["inception"],
+        "entropy_isolation_forest": per_sample_entropy["isolation_forest"],
+        "dynamic_weight_xgboost": per_sample_weights["xgboost"],
+        "dynamic_weight_inception": per_sample_weights["inception"],
+        "dynamic_weight_isolation_forest": per_sample_weights["isolation_forest"],
     }
-
-    if include_inception:
-        inception_predictor, inception_status = load_inception_predictor()
-        if inception_predictor is None:
-            inception_note = f"InceptionTime unavailable: {inception_status}"
-        else:
-            inception_proba = inception_predictor(X_scaled)
-            inception_pred = inception_proba.argmax(axis=1) + 1
-            columns.update(
-                {
-                    "inception_class": inception_pred,
-                    "inception_label": [CLASS_NAMES[int(label)] for label in inception_pred],
-                    "inception_confidence": inception_proba.max(axis=1),
-                }
-            )
-            inception_note = "InceptionTime prediction completed."
-    else:
-        inception_note = "Skipped separate InceptionTime columns for faster CPU inference."
 
     columns.update(
         {
@@ -204,8 +184,8 @@ def predict_file_to_dataframe(path: str | Path, include_inception: bool = False)
         }
     )
     out = pd.DataFrame(columns)
-    notes = parsed.notes + [f"Ensemble sources used: {', '.join(details['sources_used'])}"]
-    notes.append(inception_note)
-    if details["sources_skipped"]:
-        notes.append(f"Skipped sources: {details['sources_skipped']}")
+    notes = parsed.notes + [
+        f"Formula ensemble sources used: {', '.join(details['sources_used'])}",
+        "InceptionTime is part of the final ensemble, so CPU inference can be slower on large CSV files.",
+    ]
     return out, notes
