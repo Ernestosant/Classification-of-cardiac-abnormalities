@@ -60,6 +60,7 @@
       "inception": 0.0
     },
     "isolation_gamma": 0.0,
+    "isolation_status": "loaded",
     "inception_status": "loaded",
     "test_set_used_for_selection": false
   }

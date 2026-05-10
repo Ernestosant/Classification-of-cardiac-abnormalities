@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 
@@ -11,14 +12,15 @@ from .data import load_ecg5000
 from .metrics import multiclass_metrics, save_json, save_multiclass_confusion_matrix
 
 
-def main(epochs: int = 20, lr: float = 3e-3, batch_size: int = 64) -> None:
+def main(epochs: int = 20, lr: float = 3e-3, batch_size: int = 64, cpu_only: bool = False) -> None:
     """Train InceptionTime with tsai/fastai.
 
     This script is ready for Colab MCP or a local environment with fastai/tsai.
     It intentionally uses only the inner training fold for scaler fitting and
     validation for model selection.
     """
-    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+    if cpu_only:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
     try:
         import torch
         from fastai.learner import Learner
@@ -37,6 +39,7 @@ def main(epochs: int = 20, lr: float = 3e-3, batch_size: int = 64) -> None:
     ensure_dirs()
     set_seed(SEED, reproducible=True)
     torch.set_num_threads(max(1, min(4, torch.get_num_threads())))
+    device = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
 
     X_full, y_full = load_ecg5000("train")
     split = get_or_create_split_indices(y_full)
@@ -74,7 +77,18 @@ def main(epochs: int = 20, lr: float = 3e-3, batch_size: int = 64) -> None:
 
     learn.export(INCEPTION_MODEL_PATH)
     metrics = multiclass_metrics(true_labels, pred_labels)
-    metrics["metadata"] = {"epochs": epochs, "lr": lr, "batch_size": batch_size, "seed": SEED}
+    metrics["metadata"] = {
+        "seed": SEED,
+        "validation_size": split["validation_size"],
+        "epochs_requested": epochs,
+        "early_stopping_patience": "not used",
+        "learning_rate": lr,
+        "batch_size": batch_size,
+        "device": device,
+        "test_set_used": False,
+        "scaler_fit_scope": "inner training split only",
+        "class_weighted_loss": False,
+    }
     save_json(metrics, REPORTS_DIR / "metrics_inception_validation.json")
     save_multiclass_confusion_matrix(
         true_labels,
@@ -89,4 +103,10 @@ def main(epochs: int = 20, lr: float = 3e-3, batch_size: int = 64) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Train InceptionTime with fastai/tsai.")
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--lr", type=float, default=3e-3)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--cpu-only", action="store_true", help="Disable CUDA for this training run.")
+    args = parser.parse_args()
+    main(epochs=args.epochs, lr=args.lr, batch_size=args.batch_size, cpu_only=args.cpu_only)

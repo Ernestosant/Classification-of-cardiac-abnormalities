@@ -97,6 +97,15 @@ def download(env: dict[str, str]) -> None:
     run(["kaggle", "kernels", "output", kernel_id(), "-p", str(OUTPUT_DIR), "-o", "-q"], env)
 
 
+def safe_extract(zip_file: zipfile.ZipFile, target_dir: Path) -> None:
+    target_root = target_dir.resolve()
+    for member in zip_file.infolist():
+        destination = (target_dir / member.filename).resolve()
+        if destination != target_root and target_root not in destination.parents:
+            raise SystemExit(f"Unsafe path in Kaggle artifact archive: {member.filename}")
+        zip_file.extract(member, target_dir)
+
+
 def copy_artifacts() -> None:
     archive = OUTPUT_DIR / "inception_artifacts.zip"
     extracted = OUTPUT_DIR / "extracted"
@@ -105,7 +114,7 @@ def copy_artifacts() -> None:
             shutil.rmtree(extracted)
         extracted.mkdir(parents=True)
         with zipfile.ZipFile(archive) as zf:
-            zf.extractall(extracted)
+            safe_extract(zf, extracted)
         source_root = extracted
     else:
         source_root = OUTPUT_DIR

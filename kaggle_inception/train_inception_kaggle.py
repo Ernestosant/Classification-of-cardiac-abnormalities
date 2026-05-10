@@ -16,8 +16,10 @@ import sys
 
 def install_deps() -> None:
     packages = [
-        "fastai>=2.7",
-        "tsai>=0.3",
+        "fastai>=2.7,<2.9",
+        "tsai>=0.4,<0.5",
+        "fastprogress>=1.0,<1.1",
+        "starlette>=0.40,<0.47",
         "seaborn>=0.13",
         "joblib>=1.3",
         "scikit-learn>=1.4",

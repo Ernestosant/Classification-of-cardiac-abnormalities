@@ -18,7 +18,6 @@ from .config import (
 from .data import load_ecg5000
 from .inception_adapter import load_inception_predictor
 from .inference import (
-    anomaly_confidence,
     load_isolation_artifacts,
     load_scaler,
     load_xgboost_model,

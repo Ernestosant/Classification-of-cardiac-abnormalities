@@ -94,7 +94,13 @@ def normalize_proba(proba: np.ndarray) -> np.ndarray:
     return np.divide(proba, row_sum, out=np.full_like(proba, 1.0 / proba.shape[1]), where=row_sum > 1e-12)
 
 
-def predict_ensemble_proba(X_scaled: np.ndarray, config_path: Path = ENSEMBLE_CONFIG_PATH) -> tuple[np.ndarray, dict]:
+def predict_ensemble_proba(
+    X_scaled: np.ndarray,
+    config_path: Path = ENSEMBLE_CONFIG_PATH,
+    xgb_proba: np.ndarray | None = None,
+    if_decision: np.ndarray | None = None,
+    if_config: dict | None = None,
+) -> tuple[np.ndarray, dict]:
     config = load_ensemble_config(config_path)
 
     sources = config["supervised_sources"]
@@ -104,8 +110,10 @@ def predict_ensemble_proba(X_scaled: np.ndarray, config_path: Path = ENSEMBLE_CO
 
     xgb_weight = float(sources.get("xgboost", 0.0))
     if xgb_weight > 0.0:
-        xgb_model = load_xgboost_model()
-        probas.append(xgb_model.predict_proba(X_scaled))
+        if xgb_proba is None:
+            xgb_model = load_xgboost_model()
+            xgb_proba = xgb_model.predict_proba(X_scaled)
+        probas.append(xgb_proba)
         weights.append(xgb_weight)
         details["sources_used"].append("xgboost")
 
@@ -127,11 +135,16 @@ def predict_ensemble_proba(X_scaled: np.ndarray, config_path: Path = ENSEMBLE_CO
     supervised = sum(weight * proba for weight, proba in zip(weights_arr, probas))
     supervised = normalize_proba(supervised)
 
-    if_model, if_config = load_isolation_artifacts()
-    decisions = if_model.decision_function(X_scaled)
-    anomaly_conf = anomaly_confidence(decisions, if_config["threshold"], if_config["scale"])
-    final = apply_isolation_adjustment(supervised, anomaly_conf, config["isolation_gamma"])
-    details["isolation_gamma"] = config["isolation_gamma"]
+    gamma = float(config["isolation_gamma"])
+    details["isolation_gamma"] = gamma
+    if gamma <= 0.0:
+        return supervised, details
+
+    if if_decision is None or if_config is None:
+        if_model, if_config = load_isolation_artifacts()
+        if_decision = if_model.decision_function(X_scaled)
+    anomaly_conf = anomaly_confidence(if_decision, if_config["threshold"], if_config["scale"])
+    final = apply_isolation_adjustment(supervised, anomaly_conf, gamma)
     return final, details
 
 
@@ -149,7 +162,12 @@ def predict_file_to_dataframe(path: str | Path, include_inception: bool = False)
     if_decision = if_model.decision_function(X_scaled)
     is_anomaly = if_decision <= if_config["threshold"]
 
-    ensemble_proba, details = predict_ensemble_proba(X_scaled)
+    ensemble_proba, details = predict_ensemble_proba(
+        X_scaled,
+        xgb_proba=xgb_proba,
+        if_decision=if_decision,
+        if_config=if_config,
+    )
     ensemble_pred = ensemble_proba.argmax(axis=1) + 1
 
     columns = {

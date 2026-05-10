@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import os
 import pathlib
+import threading
 from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 
 from .config import CLASS_VALUES, INCEPTION_MODEL_PATH, N_TIMESTEPS
+
+
+_PATHLIB_PATCH_LOCK = threading.Lock()
 
 
 @lru_cache(maxsize=1)
@@ -23,16 +27,17 @@ def load_inception_predictor(model_path: Path = INCEPTION_MODEL_PATH):
     except ImportError as exc:
         return None, f"fastai/tsai are not installed: {exc}"
 
-    original_posix_path = pathlib.PosixPath
-    if os.name == "nt":
-        pathlib.PosixPath = pathlib.WindowsPath
-    try:
+    with _PATHLIB_PATCH_LOCK:
+        original_posix_path = pathlib.PosixPath
+        if os.name == "nt":
+            pathlib.PosixPath = pathlib.WindowsPath
         try:
-            learner = load_learner(model_path, cpu=True)
-        except TypeError:
-            learner = load_learner(model_path)
-    finally:
-        pathlib.PosixPath = original_posix_path
+            try:
+                learner = load_learner(model_path, cpu=True)
+            except TypeError:
+                learner = load_learner(model_path)
+        finally:
+            pathlib.PosixPath = original_posix_path
 
     def predict_proba(X_scaled: np.ndarray) -> np.ndarray:
         X_ts = X_scaled.reshape(X_scaled.shape[0], N_TIMESTEPS, 1).transpose(0, 2, 1)

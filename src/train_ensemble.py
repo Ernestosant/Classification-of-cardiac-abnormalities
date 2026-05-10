@@ -34,9 +34,19 @@ def main() -> None:
     inception_predictor, inception_status = load_inception_predictor()
     inception_proba = inception_predictor(X_val) if inception_predictor is not None else None
 
-    if_model, if_config = load_isolation_artifacts()
-    decisions = if_model.decision_function(X_val)
-    anomaly_conf = anomaly_confidence(decisions, if_config["threshold"], if_config["scale"])
+    try:
+        if_model, if_config = load_isolation_artifacts()
+        decisions = if_model.decision_function(X_val)
+        anomaly_conf = anomaly_confidence(decisions, if_config["threshold"], if_config["scale"])
+        gamma_values = [0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4]
+        isolation_status = "loaded"
+    except FileNotFoundError as exc:
+        anomaly_conf = np.zeros(len(y_val), dtype=float)
+        gamma_values = [0.0]
+        isolation_status = (
+            f"missing Isolation Forest artifacts: {exc}. "
+            "Skipped anomaly adjustment; run python -m src.train_isolation_forest to enable it."
+        )
 
     supervised_candidates = []
     if inception_proba is None:
@@ -55,7 +65,7 @@ def main() -> None:
         "pred": None,
     }
     for sources, supervised_proba in supervised_candidates:
-        for gamma in [0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4]:
+        for gamma in gamma_values:
             ensemble_proba = apply_isolation_adjustment(supervised_proba, anomaly_conf, gamma)
             pred = ensemble_proba.argmax(axis=1) + 1
             metrics = multiclass_metrics(y_val, pred)
@@ -82,6 +92,7 @@ def main() -> None:
         "supervised_sources": selected_sources,
         "candidate_supervised_sources": best["supervised_sources"],
         "isolation_gamma": best["isolation_gamma"],
+        "isolation_status": isolation_status,
         "inception_status": inception_status,
         "test_set_used_for_selection": False,
     }
@@ -100,6 +111,7 @@ def main() -> None:
     print(f"Saved ensemble config to {ENSEMBLE_CONFIG_PATH}")
     print(f"Validation macro-F1: {metrics['macro_f1']:.4f}")
     print(f"Inception status: {inception_status}")
+    print(f"Isolation Forest status: {isolation_status}")
 
 
 if __name__ == "__main__":
