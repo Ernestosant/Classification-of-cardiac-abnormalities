@@ -39,10 +39,12 @@ The project uses the ECG5000 benchmark dataset. Each row contains one heartbeat
 segment with 140 time samples. The repository includes the official train and
 test CSV files in `dataset/`.
 
-ECG5000 stores preprocessed, normalized single-heartbeat vectors rather than
-full clinical ECG strips, so the README focuses on dataset distribution and
-evaluation artifacts instead of presenting those vectors as clinical-looking ECG
-traces.
+ECG5000 is derived from a real PhysioNet ECG recording, but the benchmark files
+do not contain the full clinical strip. They contain extracted heartbeat windows
+interpolated to 140 samples; in this local copy, each heartbeat row is already
+standardized to approximately zero mean and unit variance. The README therefore
+focuses on dataset distribution and evaluation artifacts instead of presenting
+those vectors as clinical-looking ECG traces.
 
 | Split | Samples | Use |
 |---|---:|---|
