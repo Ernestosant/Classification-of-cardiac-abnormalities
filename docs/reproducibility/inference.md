@@ -8,7 +8,7 @@ fit a scaler, tune thresholds, train models, or update artifacts.
 Run:
 
 ```powershell
-python -m src.predict --input path\to\beats.csv --output predictions.csv
+python -m src.predict --input examples\sample_input.csv --output predictions.csv
 ```
 
 The input CSV must contain either:
@@ -35,6 +35,12 @@ python app.py
 
 The interface accepts a CSV file and returns a predictions table plus notes about
 label-column detection and model availability.
+
+The app includes `examples/sample_input.csv` as a loadable example. The Gradio
+table intentionally shows a compact reviewer summary: `id`, `ensemble_class`,
+`ensemble_label`, `ensemble_confidence`, and
+`isolation_anomaly_probability`. The batch CLI still writes the full prediction
+table.
 
 The app always runs the full three-model ensemble. Large CSV files can take
 longer because the InceptionTime learner is evaluated on CPU.

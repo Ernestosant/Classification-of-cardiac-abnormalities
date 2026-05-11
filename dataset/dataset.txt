@@ -1,1 +1,4 @@
-This folder contain the dataset used to train our model
+This folder contains the ECG5000 CSV files used by the project.
+
+Each row contains one ECG5000 label followed by 140 heartbeat signal samples.
+The official test split is reserved for final evaluation only.

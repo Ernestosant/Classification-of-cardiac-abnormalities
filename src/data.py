@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 from .config import CLASS_VALUES, DATA_DIR, N_TIMESTEPS
 
@@ -57,12 +58,18 @@ def read_inference_csv(path: str | Path) -> InferenceInput:
         raise FileNotFoundError(f"Input file does not exist: {path}")
 
     notes: list[str] = []
-    df = pd.read_csv(path)
+    try:
+        df = pd.read_csv(path)
+    except EmptyDataError as exc:
+        raise ValueError("The CSV is empty") from exc
     if df.empty:
         raise ValueError("The CSV is empty")
 
     if df.shape[1] not in {N_TIMESTEPS, N_TIMESTEPS + 1}:
-        no_header_df = pd.read_csv(path, header=None)
+        try:
+            no_header_df = pd.read_csv(path, header=None)
+        except EmptyDataError as exc:
+            raise ValueError("The CSV is empty") from exc
         if no_header_df.shape[1] in {N_TIMESTEPS, N_TIMESTEPS + 1}:
             df = no_header_df
             notes.append("CSV loaded without header row.")
@@ -95,4 +102,3 @@ def read_inference_csv(path: str | Path) -> InferenceInput:
         raise ValueError("The CSV contains NaN or infinite feature values")
 
     return InferenceInput(X=arr, notes=notes)
-
