@@ -26,7 +26,11 @@ The main contribution here is not a single headline accuracy number; it is a
 documented workflow that separates training, validation, final test evaluation,
 artifact reuse, and deployable inference.
 
-![Representative ECG5000 examples by class](assets/ecg_examples_by_class.png)
+The ECG5000 benchmark was derived from a real PhysioNet ECG record. The strip
+below is shown only as source context; the model itself is trained on ECG5000
+heartbeat windows, not on this full continuous recording.
+
+![Original PhysioNet chf07 ECG strip](assets/physionet_chf07_ecg_strip.png)
 
 ## Problem
 
@@ -40,6 +44,12 @@ experiment, not a clinical product.
 The project uses the ECG5000 benchmark dataset. Each row contains one heartbeat
 segment with 140 time samples. The repository includes the official train and
 test CSV files in `dataset/`.
+
+ECG5000 is derived from BIDMC Congestive Heart Failure Database record `chf07`.
+The benchmark files do not contain the full clinical strip. They contain
+heartbeat windows extracted from the original record and interpolated to 140
+samples; in this local copy, each heartbeat row is already standardized to
+approximately zero mean and unit variance.
 
 | Split | Samples | Use |
 |---|---:|---|
