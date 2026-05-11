@@ -26,8 +26,6 @@ The main contribution here is not a single headline accuracy number; it is a
 documented workflow that separates training, validation, final test evaluation,
 artifact reuse, and deployable inference.
 
-![Representative ECG5000 examples by class](assets/ecg_examples_by_class.png)
-
 ## Problem
 
 The task is to classify each heartbeat segment into one of the five ECG5000
@@ -40,6 +38,11 @@ experiment, not a clinical product.
 The project uses the ECG5000 benchmark dataset. Each row contains one heartbeat
 segment with 140 time samples. The repository includes the official train and
 test CSV files in `dataset/`.
+
+ECG5000 stores preprocessed, normalized single-heartbeat vectors rather than
+full clinical ECG strips, so the README focuses on dataset distribution and
+evaluation artifacts instead of presenting those vectors as clinical-looking ECG
+traces.
 
 | Split | Samples | Use |
 |---|---:|---|
