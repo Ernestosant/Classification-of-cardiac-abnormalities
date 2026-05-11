@@ -52,10 +52,11 @@ the Kaggle training command documented in [training](training.md).
 Run:
 
 ```powershell
+pytest -q
 python -m pytest -q
 python -m src.predict --help
 ```
 
-The first command checks leakage and pipeline guards. The second confirms that
-the batch inference command is available.
-
+The pytest commands check leakage, preprocessing, inference, and UI guard
+behavior. The final command confirms that the batch inference command is
+available.

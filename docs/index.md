@@ -19,6 +19,7 @@ project entry point in [`../README.md`](../README.md).
 | [Overview](project/overview.md) | Motivation, dataset, task definition, and high-level limitations |
 | [Repository structure](project/repository-structure.md) | Explanation of folders, generated artifacts, and source modules |
 | [Ethics and limitations](ethics-and-limitations.md) | Clinical disclaimer, dataset limits, and minority-class cautions |
+| [Model card](../MODEL_CARD.md) | Intended use, inputs, outputs, metrics, and limitations |
 
 ## Methodology
 
@@ -56,6 +57,8 @@ project entry point in [`../README.md`](../README.md).
 | [`../models/inception_cpu.pkl`](../models/inception_cpu.pkl) | Exported InceptionTime learner for CPU inference |
 | [`../models/ensemble_config.json`](../models/ensemble_config.json) | Entropy-weighted ensemble formula configuration |
 | [`../reports/model_results.md`](../reports/model_results.md) | Generated evaluation report |
+| [`../examples/sample_input.csv`](../examples/sample_input.csv) | Feature-only CSV example for inference |
+| [`../assets/gradio_demo.png`](../assets/gradio_demo.png) | Screenshot of the lightweight Gradio interface |
 
 ## Experiment Flow
 

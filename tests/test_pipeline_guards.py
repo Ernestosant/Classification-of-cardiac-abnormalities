@@ -18,6 +18,7 @@ from src.ensemble_formula import (
     isolation_forest_class_proba,
 )
 from src.inference import predict_ensemble_proba
+from app import COMPACT_COLUMNS, compact_predictions
 
 
 def test_ecg5000_shapes_and_labels():
@@ -60,6 +61,50 @@ def test_inference_reader_accepts_and_ignores_label_column(tmp_path):
 
     assert parsed.X.shape == (3, N_TIMESTEPS)
     assert any("label column" in note for note in parsed.notes)
+
+
+def test_inference_reader_rejects_invalid_feature_count(tmp_path):
+    path = tmp_path / "invalid_columns.csv"
+    pd.DataFrame(np.zeros((2, N_TIMESTEPS - 1))).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match=f"Expected {N_TIMESTEPS} feature columns"):
+        read_inference_csv(path)
+
+
+def test_inference_reader_rejects_empty_csv(tmp_path):
+    path = tmp_path / "empty.csv"
+    path.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="empty"):
+        read_inference_csv(path)
+
+
+def test_inference_reader_rejects_non_numeric_values(tmp_path):
+    path = tmp_path / "non_numeric.csv"
+    sample = pd.DataFrame([["not-a-number", *([0.0] * (N_TIMESTEPS - 1))], [*([0.0] * N_TIMESTEPS)]])
+    sample.to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="non-numeric or missing values"):
+        read_inference_csv(path)
+
+
+def test_gradio_compact_predictions_keep_reviewer_columns():
+    predictions = pd.DataFrame(
+        {
+            "id": [1],
+            "ensemble_class": [2],
+            "ensemble_label": ["PVC"],
+            "ensemble_confidence": [0.98],
+            "isolation_anomaly_probability": [0.76],
+            "xgboost_class": [2],
+            "dynamic_weight_xgboost": [0.6],
+        }
+    )
+
+    compact = compact_predictions(predictions)
+
+    assert list(compact.columns) == COMPACT_COLUMNS
+    assert compact.iloc[0]["ensemble_label"] == "PVC"
 
 
 def test_ensemble_config_does_not_use_test_for_selection():
